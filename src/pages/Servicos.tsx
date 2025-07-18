@@ -4,6 +4,7 @@ import { ServiceCard } from "@/components/services/ServiceCard";
 import { FilterPanel } from "@/components/filters/FilterPanel";
 import { SearchBar } from "@/components/search/SearchBar";
 import { Button } from "@/components/ui/button";
+import { useServicos } from "@/hooks/useServicos";
 import { SlidersHorizontal, Grid, List } from "lucide-react";
 
 const mockServicos = [
@@ -76,18 +77,21 @@ export default function Servicos() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchTerm, setSearchTerm] = useState("");
+  
+  const { data: servicos, isLoading } = useServicos(filters);
 
-  // Filter services based on current filters
-  const filteredServicos = mockServicos.filter(servico => {
-    if (filters.areas.length > 0 && !filters.areas.includes(servico.area)) return false;
-    if (filters.processos.length > 0 && !filters.processos.includes(servico.processo)) return false;
-    if (filters.subprocessos.length > 0 && !filters.subprocessos.includes(servico.subprocesso)) return false;
-    if (filters.produto && !servico.produto.toLowerCase().includes(filters.produto.toLowerCase())) return false;
-    if (filters.demandaRotina && servico.demandaRotina !== filters.demandaRotina) return false;
-    if (filters.status.length > 0 && !filters.status.includes(servico.status)) return false;
-    
-    return true;
-  });
+  // Convert servicos data for ServiceCard component
+  const formattedServicos = (servicos || []).map(servico => ({
+    id: servico.id,
+    produto: servico.produto,
+    subprocesso: servico.subprocesso.nome,
+    processo: servico.subprocesso.processo.nome,
+    area: servico.subprocesso.processo.area.nome,
+    tempoMedio: servico.tempo_medio ? `${servico.tempo_medio} min` : 'N/A',
+    sla: servico.sla ? `${servico.sla}h` : 'N/A',
+    status: (servico.status === 'ativo' ? 'Ativo' : 'Inativo') as "Ativo" | "Inativo",
+    demandaRotina: (servico.demanda_rotina as "Demanda" | "Rotina") || 'Demanda'
+  }));
 
   return (
     <div className="min-h-screen bg-background">
@@ -150,18 +154,23 @@ export default function Servicos() {
             onToggle={() => setFiltersOpen(!filtersOpen)}
             filters={filters}
             onFiltersChange={setFilters}
-            resultCount={filteredServicos.length}
+            resultCount={formattedServicos.length}
           />
 
           {/* Services Grid/List */}
           <div className="flex-1">
-            {filteredServicos.length > 0 ? (
+            {isLoading ? (
+              <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+                <p className="mt-4 text-muted-foreground">Carregando serviços...</p>
+              </div>
+            ) : formattedServicos.length > 0 ? (
               <div className={
                 viewMode === "grid" 
                   ? "grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6"
                   : "space-y-4"
               }>
-                {filteredServicos.map(servico => (
+                {formattedServicos.map(servico => (
                   <ServiceCard key={servico.id} service={servico} />
                 ))}
               </div>

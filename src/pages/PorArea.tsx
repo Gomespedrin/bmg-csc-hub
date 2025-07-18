@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Header } from "@/components/layout/Header";
 import { AreaCard } from "@/components/areas/AreaCard";
 import { SearchBar } from "@/components/search/SearchBar";
+import { useAreas } from "@/hooks/useAreas";
 import { Building2, Users, Zap } from "lucide-react";
 
 const mockAreas = [
@@ -51,13 +52,14 @@ const mockAreas = [
 
 export default function PorArea() {
   const [searchTerm, setSearchTerm] = useState("");
+  const { data: areas, isLoading } = useAreas();
   
-  const filteredAreas = mockAreas.filter(area =>
+  const filteredAreas = (areas || []).filter(area =>
     area.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    area.descricao.toLowerCase().includes(searchTerm.toLowerCase())
+    (area.descricao || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const totalServicos = mockAreas.reduce((sum, area) => sum + area.quantidadeServicos, 0);
+  const totalServicos = (areas || []).reduce((sum, area) => sum + (area.quantidadeServicos || 0), 0);
 
   return (
     <div className="min-h-screen bg-background">
@@ -77,7 +79,7 @@ export default function PorArea() {
           {/* Stats */}
           <div className="flex items-center justify-center space-x-8 mb-8">
             <div className="text-center">
-              <div className="text-2xl font-bold text-primary">{mockAreas.length}</div>
+              <div className="text-2xl font-bold text-primary">{areas?.length || 0}</div>
               <div className="text-sm text-muted-foreground">Áreas</div>
             </div>
             <div className="text-center">
@@ -101,22 +103,40 @@ export default function PorArea() {
         </div>
 
         {/* Areas Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredAreas.map(area => (
-            <AreaCard key={area.id} area={area} />
-          ))}
-        </div>
-
-        {filteredAreas.length === 0 && (
+        {isLoading ? (
           <div className="text-center py-12">
-            <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-foreground mb-2">
-              Nenhuma área encontrada
-            </h3>
-            <p className="text-muted-foreground">
-              Tente ajustar os termos de busca para encontrar a área desejada.
-            </p>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Carregando áreas...</p>
           </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredAreas.map(area => (
+                <AreaCard 
+                  key={area.id} 
+                  area={{
+                    id: area.id,
+                    nome: area.nome,
+                    descricao: area.descricao || '',
+                    quantidadeServicos: area.quantidadeServicos || 0,
+                    processos: area.processos?.map((p: any) => p.nome) || []
+                  }}
+                />
+              ))}
+            </div>
+
+            {filteredAreas.length === 0 && (
+              <div className="text-center py-12">
+                <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-foreground mb-2">
+                  Nenhuma área encontrada
+                </h3>
+                <p className="text-muted-foreground">
+                  Tente ajustar os termos de busca para encontrar a área desejada.
+                </p>
+              </div>
+            )}
+          </>
         )}
       </main>
     </div>

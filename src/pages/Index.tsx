@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowRight, Search, Zap, Users, Target, TrendingUp } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useServicos } from "@/hooks/useServicos";
+import { useAreas } from "@/hooks/useAreas";
 import heroImage from "@/assets/hero-portal-csc.jpg";
 
 const featuredServicos = [
@@ -51,6 +53,14 @@ const featuredAreas = [
 ];
 
 const Index = () => {
+  const { data: servicos, isLoading: servicosLoading } = useServicos();
+  const { data: areas, isLoading: areasLoading } = useAreas();
+
+  const featuredServicos = servicos?.slice(0, 2) || [];
+  const featuredAreas = areas?.slice(0, 2) || [];
+  const totalServicos = servicos?.length || 0;
+  const totalAreas = areas?.length || 0;
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -104,14 +114,14 @@ const Index = () => {
               <div className="w-12 h-12 mx-auto mb-4 rounded-lg bg-gradient-primary flex items-center justify-center">
                 <Target className="h-6 w-6 text-white" />
               </div>
-              <div className="text-3xl font-bold text-primary mb-2">133</div>
+              <div className="text-3xl font-bold text-primary mb-2">{totalServicos}</div>
               <div className="text-sm text-muted-foreground">Serviços Ativos</div>
             </div>
             <div className="text-center">
               <div className="w-12 h-12 mx-auto mb-4 rounded-lg bg-gradient-secondary flex items-center justify-center">
                 <Users className="h-6 w-6 text-white" />
               </div>
-              <div className="text-3xl font-bold text-secondary mb-2">6</div>
+              <div className="text-3xl font-bold text-secondary mb-2">{totalAreas}</div>
               <div className="text-sm text-muted-foreground">Áreas Atendidas</div>
             </div>
             <div className="text-center">
@@ -145,9 +155,29 @@ const Index = () => {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            {featuredServicos.map(servico => (
-              <ServiceCard key={servico.id} service={servico} />
-            ))}
+            {servicosLoading ? (
+              <div className="col-span-2 text-center py-8">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+                <p className="mt-4 text-muted-foreground">Carregando serviços...</p>
+              </div>
+            ) : (
+              featuredServicos.map(servico => (
+                <ServiceCard 
+                  key={servico.id} 
+                  service={{
+                    id: servico.id,
+                    produto: servico.produto,
+                    subprocesso: servico.subprocesso.nome,
+                    processo: servico.subprocesso.processo.nome,
+                    area: servico.subprocesso.processo.area.nome,
+                    tempoMedio: servico.tempo_medio ? `${servico.tempo_medio} min` : 'N/A',
+                    sla: servico.sla ? `${servico.sla}h` : 'N/A',
+                    status: servico.status === 'ativo' ? 'Ativo' : 'Inativo',
+                    demandaRotina: (servico.demanda_rotina as "Demanda" | "Rotina") || 'Demanda'
+                  }}
+                />
+              ))
+            )}
           </div>
 
           <div className="text-center">
@@ -174,9 +204,25 @@ const Index = () => {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            {featuredAreas.map(area => (
-              <AreaCard key={area.id} area={area} />
-            ))}
+            {areasLoading ? (
+              <div className="col-span-2 text-center py-8">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+                <p className="mt-4 text-muted-foreground">Carregando áreas...</p>
+              </div>
+            ) : (
+              featuredAreas.map(area => (
+                <AreaCard 
+                  key={area.id} 
+                  area={{
+                    id: area.id,
+                    nome: area.nome,
+                    descricao: area.descricao || '',
+                    quantidadeServicos: area.quantidadeServicos || 0,
+                    processos: area.processos?.map((p: any) => p.nome) || []
+                  }}
+                />
+              ))
+            )}
           </div>
 
           <div className="text-center">
