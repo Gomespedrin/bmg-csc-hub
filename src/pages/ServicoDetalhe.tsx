@@ -1,244 +1,192 @@
-import { useParams, Link } from "react-router-dom";
-import { Header } from "@/components/layout/Header";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Clock, Target, Users, FileText, AlertCircle, CheckCircle } from "lucide-react";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
+// src/pages/SugestaoDetalhe.tsx
+import { useEffect, useState } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import { Header } from '@/components/layout/Header';
+import { Button } from '@/components/ui/button';
+import { supabase } from '@/supabase';
+import { Badge } from '@/components/ui/badge';
 
-const mockServico = {
-  id: "1",
-  produto: "Abertura de Conta PJ",
-  subprocesso: "Onboarding",
-  processo: "Gestão de Novos Clientes",
-  area: "Recursos Humanos",
-  tempoMedio: "2 dias",
-  unidadeMedida: "dias úteis",
-  sla: "5 dias",
-  sli: "95%",
-  ano: "2024",
-  status: "Ativo",
-  demandaRotina: "Demanda",
-  oQueE: "Serviço responsável pela abertura de contas para pessoas jurídicas, incluindo validação de documentos, análise de risco e ativação da conta no sistema.",
-  quemPodeUtilizar: "Todas as agências e canais digitais autorizados para abertura de contas PJ. Gerentes de relacionamento e analistas comerciais.",
-  requisitosOperacionais: "Documentação completa da empresa (CNPJ, Contrato Social, etc.), sistema CRM atualizado, acesso ao módulo de abertura de contas.",
-  observacoes: "Em casos de empresas de alto risco, é necessário aprovação adicional do comitê de crédito. Documentos digitalizados devem ter qualidade mínima de 300 DPI."
+interface SugestaoRow {
+  id: string;
+  tipo: string;
+  status: string;
+  justificativa: string;
+  dados_sugeridos: any;
+  created_at: string;
+  updated_at: string;
+  comentario_admin?: string | null;
+}
+
+const statusColor: Record<string, string> = {
+  pendente: 'bg-amber-500/15 text-amber-600',
+  aprovado: 'bg-emerald-500/15 text-emerald-600',
+  rejeitado: 'bg-red-500/15 text-red-600'
 };
 
-export default function ServicoDetalhe() {
+export default function SugestaoDetalhe() {
   const { id } = useParams();
+  const [data, setData] = useState<SugestaoRow | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      if (!id) return;
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('sugestoes')
+          .select('*')
+          .eq('id', id)
+          .single();
+        if (error) throw error;
+        setData(data as any);
+      } catch (e: any) {
+        setErrorMsg(e.message);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [id]);
+
+  const ds = data?.dados_sugeridos;
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      
-      <main className="container mx-auto px-6 py-8">
-        {/* Breadcrumb */}
-        <Breadcrumb className="mb-6">
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link to="/">Início</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link to="/por-area">{mockServico.area}</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbLink href="#">{mockServico.processo}</BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbLink href="#">{mockServico.subprocesso}</BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>{mockServico.produto}</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
+      <main className="container mx-auto px-4 md:px-8 py-8 max-w-5xl">
+        {loading && <div>Carregando...</div>}
+        {!loading && errorMsg && (
+          <div className="text-red-600">Erro: {errorMsg}</div>
+        )}
+        {!loading && data && (
+          <div className="space-y-8">
 
-        {/* Back Button */}
-        <Button variant="ghost" asChild className="mb-6">
-          <Link to="/servicos">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Voltar aos Serviços
-          </Link>
-        </Button>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h1 className="text-2xl font-semibold mb-1">
+                  Sugestão <span className="text-muted-foreground">#{data.id.slice(0, 8)}</span>
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                  Criada em {new Date(data.created_at).toLocaleString()} • Última atualização {new Date(data.updated_at).toLocaleString()}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusColor[data.status] || 'bg-secondary/20'}`}>
+                  {data.status}
+                </span>
+                <span className="px-3 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                  {data.tipo === 'novo' ? 'Novo' : 'Edição'}
+                </span>
+                {ds?.meta?.escopo && (
+                  <span className="px-3 py-1 rounded-full text-xs font-medium bg-accent/10 text-accent">
+                    {ds.meta.escopo}
+                  </span>
+                )}
+              </div>
+            </div>
 
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-start justify-between mb-4">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground mb-2">
-                {mockServico.produto}
-              </h1>
-              <p className="text-lg text-muted-foreground">
-                {mockServico.area} • {mockServico.processo} • {mockServico.subprocesso}
+            <section className="p-6 border rounded-lg bg-card space-y-4">
+              <h2 className="font-medium text-lg">Justificativa</h2>
+              <p className="whitespace-pre-line text-sm leading-relaxed">
+                {data.justificativa}
               </p>
-            </div>
-            <div className="flex space-x-2">
-              <Badge 
-                variant={mockServico.status === "Ativo" ? "default" : "secondary"}
-                className={mockServico.status === "Ativo" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}
-              >
-                {mockServico.status}
-              </Badge>
-              <Badge 
-                variant="outline" 
-                className={mockServico.demandaRotina === "Demanda" 
-                  ? "border-warning text-warning" 
-                  : "border-accent text-accent"
-                }
-              >
-                {mockServico.demandaRotina}
-              </Badge>
-            </div>
-          </div>
-        </div>
+            </section>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* O que é */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <FileText className="h-5 w-5 text-primary" />
-                  <span>O que é</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-foreground leading-relaxed">
-                  {mockServico.oQueE}
-                </p>
-              </CardContent>
-            </Card>
+            <section className="p-6 border rounded-lg bg-card space-y-4">
+              <h2 className="font-medium text-lg">Detalhes Sugeridos</h2>
+              {!ds && <p className="text-muted-foreground text-sm">Sem dados estruturados.</p>}
 
-            {/* Quem pode utilizar */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Users className="h-5 w-5 text-secondary" />
-                  <span>Quem pode utilizar</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-foreground leading-relaxed">
-                  {mockServico.quemPodeUtilizar}
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* Requisitos Operacionais */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <CheckCircle className="h-5 w-5 text-accent" />
-                  <span>Requisitos Operacionais</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-foreground leading-relaxed">
-                  {mockServico.requisitosOperacionais}
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* Observações */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <AlertCircle className="h-5 w-5 text-warning" />
-                  <span>Observações</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-foreground leading-relaxed">
-                  {mockServico.observacoes}
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Acordos com Clientes */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Acordos com Clientes</CardTitle>
-                <CardDescription>Métricas e compromissos de qualidade</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center space-x-2">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">Tempo Médio</span>
+              {ds && (
+                <div className="space-y-6">
+                  {/* Meta */}
+                  <div>
+                    <h3 className="text-sm font-semibold mb-2">Meta</h3>
+                    <div className="grid md:grid-cols-3 gap-2 text-sm">
+                      <div><strong>Form Version:</strong> {ds.meta?.form_version ?? '-'}</div>
+                      <div><strong>Modo:</strong> {ds.meta?.modo ?? '-'}</div>
+                      <div><strong>Escopo:</strong> {ds.meta?.escopo ?? '-'}</div>
+                    </div>
                   </div>
-                  <span className="text-sm font-bold text-primary">{mockServico.tempoMedio}</span>
-                </div>
-                
-                <Separator />
-                
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium">Unidade de Medida</span>
-                  <span className="text-sm">{mockServico.unidadeMedida}</span>
-                </div>
-                
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center space-x-2">
-                    <Target className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">SLA</span>
-                  </div>
-                  <span className="text-sm font-bold text-secondary">{mockServico.sla}</span>
-                </div>
-                
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium">SLI</span>
-                  <Badge variant="outline" className="border-accent text-accent">
-                    {mockServico.sli}
-                  </Badge>
-                </div>
-                
-                <Separator />
-                
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium">ANO</span>
-                  <span className="text-sm">{mockServico.ano}</span>
-                </div>
-              </CardContent>
-            </Card>
 
-            {/* Actions */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Ações</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Button variant="outline" className="w-full" asChild>
-                  <Link to="/sugestoes/nova">
-                    Sugerir Melhoria
-                  </Link>
-                </Button>
-                <Button variant="ghost" className="w-full">
-                  Reportar Problema
-                </Button>
-              </CardContent>
-            </Card>
+                  {/* Hierarquia */}
+                  <div>
+                    <h3 className="text-sm font-semibold mb-2">Hierarquia (IDs)</h3>
+                    <div className="grid md:grid-cols-4 gap-2 text-sm">
+                      <div><strong>Área:</strong> {ds.hierarquia?.area_id || '-'}</div>
+                      <div><strong>Processo:</strong> {ds.hierarquia?.processo_id || '-'}</div>
+                      <div><strong>Subprocesso:</strong> {ds.hierarquia?.subprocesso_id || '-'}</div>
+                      <div><strong>Serviço:</strong> {ds.hierarquia?.servico_id || '-'}</div>
+                    </div>
+                  </div>
+
+                  {/* Conteúdo */}
+                  <div>
+                    <h3 className="text-sm font-semibold mb-2">Conteúdo</h3>
+                    <div className="grid md:grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <strong>Nome sugerido:</strong><br />
+                        {ds.conteudo?.nome_sugerido || '-'}
+                      </div>
+                      <div>
+                        <strong>SLA:</strong> {ds.conteudo?.sla ?? '-'}
+                      </div>
+                      <div>
+                        <strong>SLI (%):</strong> {ds.conteudo?.sli ?? '-'}
+                      </div>
+                      <div>
+                        <strong>Tempo Médio:</strong>{' '}
+                        {ds.conteudo?.tempo_medio
+                          ? `${ds.conteudo.tempo_medio.valor} ${ds.conteudo.tempo_medio.unidade}`
+                          : '-'}
+                      </div>
+                      <div>
+                        <strong>Unidade Medida:</strong> {ds.conteudo?.unidade_medida || '-'}
+                      </div>
+                      <div>
+                        <strong>Demanda / Rotina:</strong> {ds.conteudo?.demanda_rotina || '-'}
+                      </div>
+                      <div className="md:col-span-2">
+                        <strong>Quem pode utilizar:</strong><br />
+                        {ds.conteudo?.quem_pode_utilizar || '-'}
+                      </div>
+                      <div className="md:col-span-2">
+                        <strong>Requisitos Operacionais:</strong><br />
+                        {ds.conteudo?.requisitos_operacionais || '-'}
+                      </div>
+                      <div className="md:col-span-2">
+                        <strong>Descrição / Observação:</strong><br />
+                        {ds.conteudo?.descricao || '-'}
+                      </div>
+                      <div className="md:col-span-2">
+                        <strong>Observações:</strong><br />
+                        {ds.conteudo?.observacoes || '-'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </section>
+
+            {data.comentario_admin && (
+              <section className="p-6 border rounded-lg bg-card space-y-2">
+                <h2 className="font-medium text-lg">Comentário da Avaliação</h2>
+                <p className="text-sm whitespace-pre-line">
+                  {data.comentario_admin}
+                </p>
+              </section>
+            )}
+
+            <div className="flex gap-4">
+              <Button asChild variant="outline">
+                <Link to="/sugestoes/nova">Enviar outra</Link>
+              </Button>
+              <Button asChild>
+                <Link to="/">Voltar ao Início</Link>
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
       </main>
     </div>
   );

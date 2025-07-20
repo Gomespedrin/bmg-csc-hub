@@ -7,98 +7,57 @@ import { Button } from "@/components/ui/button";
 import { useServicos } from "@/hooks/useServicos";
 import { SlidersHorizontal, Grid, List } from "lucide-react";
 
-const mockServicos = [
-  {
-    id: "1",
-    produto: "Abertura de Conta PJ",
-    subprocesso: "Onboarding",
-    processo: "Gestão de Novos Clientes", 
-    area: "Recursos Humanos",
-    tempoMedio: "2 dias",
-    sla: "5 dias",
-    status: "Ativo" as const,
-    demandaRotina: "Demanda" as const
-  },
-  {
-    id: "2",
-    produto: "Processamento de Folha",
-    subprocesso: "Cálculo de Salários",
-    processo: "Folha de Pagamento",
-    area: "Recursos Humanos", 
-    tempoMedio: "1 dia",
-    sla: "2 dias",
-    status: "Ativo" as const,
-    demandaRotina: "Rotina" as const
-  },
-  {
-    id: "3",
-    produto: "Deploy de Aplicação",
-    subprocesso: "CI/CD",
-    processo: "Desenvolvimento de Sistemas",
-    area: "Tecnologia da Informação",
-    tempoMedio: "30 min",
-    sla: "2 horas", 
-    status: "Ativo" as const,
-    demandaRotina: "Demanda" as const
-  },
-  {
-    id: "4",
-    produto: "Backup de Dados",
-    subprocesso: "Backup Automático",
-    processo: "Infraestrutura",
-    area: "Tecnologia da Informação",
-    tempoMedio: "4 horas",
-    sla: "6 horas",
-    status: "Ativo" as const,
-    demandaRotina: "Rotina" as const
-  },
-  {
-    id: "5",
-    produto: "Análise de Contratos",
-    subprocesso: "Revisão Legal",
-    processo: "Gestão de Contratos",
-    area: "Jurídico",
-    tempoMedio: "3 dias",
-    sla: "5 dias",
-    status: "Inativo" as const,
-    demandaRotina: "Demanda" as const
-  }
-];
-
 export default function Servicos() {
   const [filters, setFilters] = useState({
-    areas: [],
-    processos: [],
-    subprocessos: [],
+    areas: [] as string[],
+    processos: [] as string[],
+    subprocessos: [] as string[],
     produto: "",
     demandaRotina: "",
-    status: []
+    status: [] as string[]
   });
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchTerm, setSearchTerm] = useState("");
-  
+
   const { data: servicos, isLoading } = useServicos(filters);
 
-  // Convert servicos data for ServiceCard component
-  const formattedServicos = (servicos || []).map(servico => ({
-    id: servico.id,
-    produto: servico.produto,
-    subprocesso: servico.subprocesso.nome,
-    processo: servico.subprocesso.processo.nome,
-    area: servico.subprocesso.processo.area.nome,
-    tempoMedio: servico.tempo_medio ? `${servico.tempo_medio} min` : 'N/A',
-    sla: servico.sla ? `${servico.sla}h` : 'N/A',
-    status: (servico.status === 'ativo' ? 'Ativo' : 'Inativo') as "Ativo" | "Inativo",
-    demandaRotina: (servico.demanda_rotina as "Demanda" | "Rotina") || 'Demanda'
-  }));
+  // 1. Limpa itens nulos/undefined
+  const base = (servicos || []).filter(Boolean);
+
+  // 2. Formata
+  const formattedServicos = base.map(servico => {
+    const produto = servico?.produto || "";
+    const subprocessoNome = servico?.subprocesso?.nome;
+    const processoNome = servico?.subprocesso?.processo?.nome;
+    const areaNome = servico?.subprocesso?.processo?.area?.nome;
+
+    return {
+      id: servico.id,
+      produto,
+      subprocesso: subprocessoNome,
+      processo: processoNome,
+      area: areaNome,
+      tempoMedio: servico.tempo_medio
+        ? `${servico.tempo_medio} ${servico.unidade_medida || ""}`.trim()
+        : "N/A",
+      sla: servico.sla
+        ? `${servico.sla}${servico.unidade_medida ? " " + servico.unidade_medida : ""}`
+        : "N/A",
+      status: (servico.status === "ativo" ? "Ativo" : "Inativo") as "Ativo" | "Inativo",
+      demandaRotina: (servico.demanda_rotina as "Demanda" | "Rotina") || "Demanda"
+    };
+  }).filter(s => {
+    if (!searchTerm) return true;
+    return s.produto.toLowerCase().includes(searchTerm.toLowerCase());
+  });
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      
+
       <main className="container mx-auto px-6 py-8">
-        {/* Header */}
+        {/* Título / Subtítulo */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-foreground mb-4">
             Catálogo de Serviços
@@ -107,12 +66,16 @@ export default function Servicos() {
             Explore todos os serviços disponíveis no Centro de Serviços Compartilhados.
           </p>
 
-          {/* Search and Controls */}
+          {/* Busca + Controles */}
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
             <div className="flex-1 max-w-md">
-              <SearchBar placeholder="Buscar serviços..." />
+              <SearchBar
+                placeholder="Buscar serviços..."
+                value={searchTerm}
+                onChange={(v) => setSearchTerm(v)}
+              />
             </div>
-            
+
             <div className="flex items-center space-x-2">
               <Button
                 variant="outline"
@@ -123,7 +86,7 @@ export default function Servicos() {
                 <SlidersHorizontal className="h-4 w-4" />
                 <span>Filtros</span>
               </Button>
-              
+
               <div className="flex items-center border rounded-lg p-1">
                 <Button
                   variant={viewMode === "grid" ? "default" : "ghost"}
@@ -146,9 +109,7 @@ export default function Servicos() {
           </div>
         </div>
 
-        {/* Content */}
         <div className="flex gap-6">
-          {/* Filter Panel */}
           <FilterPanel
             isOpen={filtersOpen}
             onToggle={() => setFiltersOpen(!filtersOpen)}
@@ -157,7 +118,6 @@ export default function Servicos() {
             resultCount={formattedServicos.length}
           />
 
-          {/* Services Grid/List */}
           <div className="flex-1">
             {isLoading ? (
               <div className="text-center py-12">
@@ -165,13 +125,19 @@ export default function Servicos() {
                 <p className="mt-4 text-muted-foreground">Carregando serviços...</p>
               </div>
             ) : formattedServicos.length > 0 ? (
-              <div className={
-                viewMode === "grid" 
-                  ? "grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6"
-                  : "space-y-4"
-              }>
+              <div
+                className={
+                  viewMode === "grid"
+                    ? "grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6"
+                    : "space-y-4"
+                }
+              >
                 {formattedServicos.map(servico => (
-                  <ServiceCard key={servico.id} service={servico} />
+                  <ServiceCard
+                    key={servico.id}
+                    service={servico}
+                    // IMPORTANTE: garantir que ServiceCard use Link interno para detalhe
+                  />
                 ))}
               </div>
             ) : (
@@ -181,7 +147,7 @@ export default function Servicos() {
                   Nenhum serviço encontrado
                 </h3>
                 <p className="text-muted-foreground">
-                  Tente ajustar os filtros ou termos de busca para encontrar os serviços desejados.
+                  Tente ajustar os filtros ou termos de busca.
                 </p>
               </div>
             )}

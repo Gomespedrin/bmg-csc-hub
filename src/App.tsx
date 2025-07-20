@@ -1,37 +1,27 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
-import PorArea from "./pages/PorArea";
-import Servicos from "./pages/Servicos";
-import ServicoDetalhe from "./pages/ServicoDetalhe";
-import AreaDetalhe from "./pages/AreaDetalhe";
-import NovaSugestao from "./pages/NovaSugestao";
-import NotFound from "./pages/NotFound";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import Index from "@/pages/Index";
+import PorArea from "@/pages/PorArea";
+import AreaDetalhe from "@/pages/AreaDetalhe";
+import Servicos from "@/pages/Servicos";
+import ServicoDetalhe from "@/pages/ServicoDetalhe";
+import NovaSugestao from "@/pages/NovaSugestao";
+import SugestaoDetalhe from "@/pages/SugestaoDetalhe";
+import NotFound from "@/pages/NotFound";
 
-const queryClient = new QueryClient();
-
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/por-area" element={<PorArea />} />
-          <Route path="/servicos" element={<Servicos />} />
-          <Route path="/servicos/:id" element={<ServicoDetalhe />} />
-          <Route path="/areas/:areaId" element={<AreaDetalhe />} />
-          <Route path="/sugestoes/nova" element={<NovaSugestao />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
-
+function App() {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<Index />} />
+        <Route path="/por-area" element={<PorArea />} />
+        <Route path="/areas/:areaId" element={<AreaDetalhe />} />
+        <Route path="/servicos" element={<Servicos />} />
+        <Route path="/servicos/:id" element={<ServicoDetalhe />} />
+        <Route path="/sugestoes/nova" element={<NovaSugestao />} />
+        <Route path="/sugestoes/:id" element={<SugestaoDetalhe />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </Router>
+  );
+}
 export default App;

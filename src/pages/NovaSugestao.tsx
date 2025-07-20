@@ -1,507 +1,525 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { supabase } from "@/supabase";
+import type {
+  Area,
+  Processo,
+  Subprocesso,
+  Servico,
+  SugestaoEscopo,
+  SugestaoModo
+} from "@/types";
+import { useNavigate } from "react-router-dom";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { ArrowLeft, Send, Lightbulb } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
-import { useToast } from "@/hooks/use-toast";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
-import { supabase } from "@/integrations/supabase/client";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
-/**
- * Tipos permitidos de sugestão.
- * 'edicao' substitui o antigo 'melhoria'.
- */
-type TipoSugestao = "novo" | "edicao";
-
-/**
- * Estrutura de estado do formulário (campos visíveis para o usuário).
- */
-interface FormData {
-  produto: string;
-  area: string;
-  processo: string;
-  subprocesso: string;
-  demandaRotina: string;
-  oQueE: string;
-  quemPodeUtilizar: string;
-  tempoMedioValor: string;
-  tempoMedioUnidade: string;
-  sla: string;
-  sli: string;
-  unidadeMedida: string;
-  requisitosOperacionais: string;
-  observacoes: string;
-  justificativa: string;
+interface Hierarquia {
+  area?: Area | null;
+  processo?: Processo | null;
+  subprocesso?: Subprocesso | null;
+  servico?: Servico | null;
 }
 
-const initialForm: FormData = {
-  produto: "",
-  area: "",
-  processo: "",
-  subprocesso: "",
-  demandaRotina: "",
-  oQueE: "",
-  quemPodeUtilizar: "",
-  tempoMedioValor: "",
-  tempoMedioUnidade: "",
-  sla: "",
-  sli: "",
-  unidadeMedida: "",
-  requisitosOperacionais: "",
-  observacoes: "",
-  justificativa: ""
-};
-
-export default function NovaSugestao() {
-  const { toast } = useToast();
+const NovaSugestao = () => {
   const navigate = useNavigate();
 
-  const [tipoSugestao, setTipoSugestao] = useState<TipoSugestao | "">("");
-  const [formData, setFormData] = useState<FormData>(initialForm);
-  const [submitting, setSubmitting] = useState(false);
+  /** =================== ESTADO BÁSICO =================== */
+  const [modo, setModo] = useState<SugestaoModo>("novo");
+  const [escopo, setEscopo] = useState<SugestaoEscopo>("area");
 
-  /**
-   * Lista mock de áreas – depois podemos substituir via query.
-   */
-  const mockAreas = [
-    "Recursos Humanos",
-    "Tecnologia da Informação",
-    "Financeiro",
-    "Jurídico",
-    "Compliance",
-    "Operações"
-  ];
+  const [areas, setAreas] = useState<Area[]>([]);
+  const [processos, setProcessos] = useState<Processo[]>([]);
+  const [subprocessos, setSubprocessos] = useState<Subprocesso[]>([]);
+  const [servicos, setServicos] = useState<Servico[]>([]);
 
-  const updateField = (field: keyof FormData, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
+  const [areaId, setAreaId] = useState<string>("");
+  const [processoId, setProcessoId] = useState<string>("");
+  const [subprocessoId, setSubprocessoId] = useState<string>("");
+  const [servicoId, setServicoId] = useState<string>("");
 
-  const normalizeTipo = (t: string): TipoSugestao => {
-    if (t === "melhoria") return "edicao";
-    return t === "novo" ? "novo" : "edicao";
-  };
+  const [nomeSugerido, setNomeSugerido] = useState("");
+  const [descricao, setDescricao] = useState("");
+  const [observacoes, setObservacoes] = useState("");
+  const [justificativa, setJustificativa] = useState("");
 
-  /**
-   * Validação mínima.
-   */
-  const validate = (): string | null => {
-    if (!tipoSugestao) return "Selecione o tipo.";
-    if (!formData.produto.trim()) return "Informe o Produto/Serviço.";
-    if (!formData.area.trim()) return "Selecione a Área.";
-    if (!formData.oQueE.trim()) return "Preencha o campo 'O que é'.";
-    return null;
-  };
+  const [carregando, setCarregando] = useState(false);
+  const [snapshot, setSnapshot] = useState<any>(null);
 
-  const resetForm = () => {
-    setTipoSugestao("");
-    setFormData(initialForm);
-  };
+  const [sucessoId, setSucessoId] = useState<string | null>(null);
 
-  /**
-   * Monta o objeto JSON que será salvo em 'dados_sugeridos'.
-   */
-  const buildDadosSugeridos = () => {
-    // Conversões numéricas seguras
-    const slaNum = formData.sla.trim() ? Number(formData.sla.trim().replace(",", ".")) : null;
-    const sliNum = formData.sli.trim() ? Number(formData.sli.trim().replace(",", ".")) : null;
-    const tempoValorNum = formData.tempoMedioValor.trim()
-      ? Number(formData.tempoMedioValor.trim().replace(",", "."))
-      : null;
+  /** =================== CARREGAR LISTAS =================== */
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from("areas").select("id,nome,descricao").order("nome");
+      if (data) setAreas(data as Area[]);
+    })();
+  }, []);
 
-    return {
-      produto: formData.produto.trim(),
-      area: formData.area.trim(),
-      processo: formData.processo.trim() || null,
-      subprocesso: formData.subprocesso.trim() || null,
-      demanda_rotina: formData.demandaRotina || null,
-      descricao: formData.oQueE.trim(),
-      quem_pode_utilizar: formData.quemPodeUtilizar.trim() || null,
-      tempo_medio: tempoValorNum
-        ? {
-            valor: tempoValorNum,
-            unidade: formData.tempoMedioUnidade.trim() || formData.unidadeMedida.trim() || null
-          }
-        : null,
-      sla: slaNum,
-      sli: sliNum,
-      unidade_medida: formData.unidadeMedida.trim() || null,
-      requisitos_operacionais: formData.requisitosOperacionais.trim() || null,
-      observacoes: formData.observacoes.trim() || null,
-      justificativa: formData.justificativa.trim() || null,
-      versao_proposta: 1
-    };
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    const errorMsg = validate();
-    if (errorMsg) {
-      toast({
-        title: "Campos obrigatórios",
-        description: errorMsg,
-        variant: "destructive"
-      });
+  useEffect(() => {
+    if (!areaId || (modo === "novo" && escopo === "area")) {
+      setProcessos([]);
+      setProcessoId("");
       return;
     }
+    (async () => {
+      const { data } = await supabase
+        .from("processos")
+        .select("id,nome,area_id")
+        .eq("area_id", areaId)
+        .order("nome");
+      setProcessos((data as Processo[]) || []);
+    })();
+  }, [areaId, modo, escopo]);
 
-    setSubmitting(true);
-    const tipoFinal = normalizeTipo(tipoSugestao);
+  useEffect(() => {
+    if (!processoId || (modo === "novo" && escopo === "processo")) {
+      setSubprocessos([]);
+      setSubprocessoId("");
+      return;
+    }
+    (async () => {
+      const { data } = await supabase
+        .from("subprocessos")
+        .select("id,nome,processo_id")
+        .eq("processo_id", processoId)
+        .order("nome");
+      setSubprocessos((data as Subprocesso[]) || []);
+    })();
+  }, [processoId, modo, escopo]);
 
-    const dadosSugeridos = buildDadosSugeridos();
+  useEffect(() => {
+    if (!subprocessoId || (modo === "novo" && escopo === "subprocesso")) {
+      setServicos([]);
+      setServicoId("");
+      return;
+    }
+    (async () => {
+      const { data } = await supabase
+        .from("servicos")
+        .select("id,produto as produto,subprocesso_id,status,sla,tempo_medio,unidade_medida,demanda_rotina,created_at")
+        .eq("subprocesso_id", subprocessoId)
+        .order("produto");
+      setServicos((data as Servico[]) || []);
+    })();
+  }, [subprocessoId, modo, escopo]);
 
-    try {
-      /**
-       * Insert na tabela 'sugestoes'.
-       * Campos obrigatórios conforme schema:
-       * - tipo (text)
-       * - dados_sugeridos (json)
-       * - justificativa (opcional)
-       * - criado_por: definido via trigger/policy (ideal) ou enviar manual
-       */
-      const { error } = await supabase
-        .from("sugestoes")
-        .insert([
-          {
-            tipo: tipoFinal,
-            justificativa: formData.justificativa.trim() || null,
-            dados_sugeridos: dadosSugeridos
-            // criado_por: <-- NÃO enviar se trigger cuidando. Se não tiver trigger e policy exigir, veremos depois.
-          }
-        ]);
+  /** =================== RESET AO MUDAR MODO/ESCOPO =================== */
+  useEffect(() => {
+    // Se trocar escopo ou modo, limpar ids inválidos e snapshot
+    setSnapshot(null);
+    setNomeSugerido("");
+    setDescricao("");
+    setObservacoes("");
+    setJustificativa("");
 
-      if (error) {
-        console.error("Erro insert sugestao:", error);
-        toast({
-          title: "Erro ao enviar",
-          description: "Não foi possível registrar a sugestão.",
-          variant: "destructive"
-        });
-        setSubmitting(false);
-        return;
+    // Limpa níveis abaixo do alvo de edição/novo
+    if (escopo === "area") {
+      setAreaId("");
+      setProcessoId("");
+      setSubprocessoId("");
+      setServicoId("");
+    } else if (escopo === "processo") {
+      setProcessoId("");
+      setSubprocessoId("");
+      setServicoId("");
+    } else if (escopo === "subprocesso") {
+      setSubprocessoId("");
+      setServicoId("");
+    } else if (escopo === "servico") {
+      setServicoId("");
+    }
+  }, [modo, escopo]);
+
+  /** =================== CAPTURAR SNAPSHOT (EDIÇÃO) =================== */
+  useEffect(() => {
+    if (modo !== "edicao") return;
+    const fetchSnapshot = async () => {
+      let target: any = null;
+      if (escopo === "area" && areaId) {
+        const { data } = await supabase.from("areas").select("*").eq("id", areaId).single();
+        target = data;
+      } else if (escopo === "processo" && processoId) {
+        const { data } = await supabase
+          .from("processos")
+          .select("*, area:areas(id,nome)")
+          .eq("id", processoId)
+          .single();
+        target = data;
+      } else if (escopo === "subprocesso" && subprocessoId) {
+        const { data } = await supabase
+          .from("subprocessos")
+          .select("*, processo:processos(id,nome, area:areas(id,nome))")
+          .eq("id", subprocessoId)
+          .single();
+        target = data;
+      } else if (escopo === "servico" && servicoId) {
+        const { data } = await supabase
+          .from("servicos")
+          .select("*, subprocesso:subprocessos(id,nome, processo:processos(id,nome, area:areas(id,nome)))")
+          .eq("id", servicoId)
+          .single();
+        target = data;
       }
+      setSnapshot(target);
+    };
+    fetchSnapshot();
+  }, [modo, escopo, areaId, processoId, subprocessoId, servicoId]);
 
-      toast({
-        title: "Sugestão enviada!",
-        description: "Sua sugestão foi registrada e está pendente de análise."
-      });
+  /** =================== VALIDAÇÃO =================== */
+  const erroHierarquia = useMemo(() => {
+    if (modo === "novo") {
+      if (escopo === "processo" && !areaId) return "Selecione a Área para criar o Processo.";
+      if (escopo === "subprocesso" && (!areaId || !processoId)) return "Selecione Área e Processo.";
+      if (escopo === "servico" && (!areaId || !processoId || !subprocessoId))
+        return "Selecione Área, Processo e Subprocesso.";
+      return null;
+    } else {
+      if (escopo === "area" && !areaId) return "Selecione a Área a editar.";
+      if (escopo === "processo" && !processoId) return "Selecione o Processo a editar.";
+      if (escopo === "subprocesso" && !subprocessoId) return "Selecione o Subprocesso a editar.";
+      if (escopo === "servico" && !servicoId) return "Selecione o Serviço a editar.";
+      return null;
+    }
+  }, [modo, escopo, areaId, processoId, subprocessoId, servicoId]);
 
-      resetForm();
-      setTimeout(() => {
-        navigate("/");
-      }, 1500);
-    } catch (err: any) {
-      console.error(err);
-      toast({
-        title: "Erro inesperado",
-        description: "Falha inesperada ao enviar.",
-        variant: "destructive"
-      });
-    } finally {
-      setSubmitting(false);
+  /** =================== SUBMIT =================== */
+  const handleSubmit = async () => {
+    if (erroHierarquia) return;
+    if (!justificativa.trim()) return;
+
+    setCarregando(true);
+
+    const payload: any = {
+      modo,
+      escopo,
+      justificativa: justificativa.trim(),
+      nome_sugerido: nomeSugerido.trim() || null,
+      descricao: descricao.trim() || null,
+      observacoes: observacoes.trim() || null,
+      status: "pendente"
+    };
+
+    // IDs de referência (apenas o necessário conforme escopo)
+    if (escopo === "area") {
+      if (modo === "edicao") payload.area_id = areaId;
+    } else if (escopo === "processo") {
+      payload.area_id = areaId;
+      if (modo === "edicao") payload.processo_id = processoId;
+    } else if (escopo === "subprocesso") {
+      payload.area_id = areaId;
+      payload.processo_id = processoId;
+      if (modo === "edicao") payload.subprocesso_id = subprocessoId;
+    } else if (escopo === "servico") {
+      payload.area_id = areaId;
+      payload.processo_id = processoId;
+      payload.subprocesso_id = subprocessoId;
+      if (modo === "edicao") payload.servico_id = servicoId;
+    }
+
+    if (modo === "edicao" && snapshot) {
+      payload.dados_atuais = snapshot;
+    }
+
+    const { data, error } = await supabase.from("sugestoes").insert(payload).select("id").single();
+    setCarregando(false);
+
+    if (!error && data) {
+      setSucessoId(data.id);
+      // Limpa somente se quiser nova
+      // (não limpar agora para permitir clicar em “Enviar outra”)
+    } else {
+      alert("Erro ao enviar: " + (error?.message || "desconhecido"));
     }
   };
+
+  const limparParaNova = () => {
+    setSucessoId(null);
+    setModo("novo");
+    setEscopo("area");
+    setAreaId("");
+    setProcessoId("");
+    setSubprocessoId("");
+    setServicoId("");
+    setNomeSugerido("");
+    setDescricao("");
+    setObservacoes("");
+    setJustificativa("");
+    setSnapshot(null);
+  };
+
+  /** =================== RENDER HELPERS =================== */
+  const renderSelect = (
+    label: string,
+    value: string,
+    onChange: (v: string) => void,
+    options: { id: string; nome: string }[],
+    placeholder: string,
+    disabled?: boolean
+  ) => (
+    <div className="flex flex-col gap-1">
+      <Label className="text-sm font-medium">{label}</Label>
+      <select
+        className="border rounded px-3 py-2 text-sm bg-white disabled:bg-muted"
+        value={value}
+        disabled={disabled}
+        onChange={e => onChange(e.target.value)}
+      >
+        <option value="">{placeholder}</option>
+        {options.map(o => (
+          <option key={o.id} value={o.id}>
+            {o.nome}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+
+  const nomeSugLabelMap: Record<SugestaoEscopo, string> = {
+    area: "Nome sugerido da Área (opcional)",
+    processo: "Nome sugerido do Processo (opcional)",
+    subprocesso: "Nome sugerido do Subprocesso (opcional)",
+    servico: "Nome sugerido do Serviço (opcional)"
+  };
+
+  /** Qual nível precisa selecionar para NOVO? (superiores) */
+  const precisaArea = escopo !== "area";
+  const precisaProcesso = escopo !== "area" && escopo !== "processo";
+  const precisaSubprocesso = escopo === "servico";
+
+  /** E para EDIÇÃO? Seleciona exatamente o alvo (e superiores para filtro) */
+  const edicaoAlvoArea = modo === "edicao" && escopo === "area";
+  const edicaoAlvoProcesso = modo === "edicao" && escopo === "processo";
+  const edicaoAlvoSub = modo === "edicao" && escopo === "subprocesso";
+  const edicaoAlvoServico = modo === "edicao" && escopo === "servico";
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
+      <div className="container mx-auto px-6 py-10 max-w-4xl">
+        <h1 className="text-3xl font-bold mb-8">Nova Sugestão</h1>
 
-      <main className="container mx-auto px-6 py-8">
-        <Breadcrumb className="mb-6">
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link to="/">Início</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>Nova Sugestão</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
+        {/* Modo */}
+        <div className="rounded-lg border bg-card p-6 mb-6">
+          <h2 className="font-semibold mb-4">Modo</h2>
+            <RadioGroup
+              value={modo}
+              onValueChange={v => setModo(v as SugestaoModo)}
+              className="flex gap-8"
+            >
+              <Label className="flex items-center gap-2 cursor-pointer">
+                <RadioGroupItem value="novo" /> Novo
+              </Label>
+              <Label className="flex items-center gap-2 cursor-pointer">
+                <RadioGroupItem value="edicao" /> Edição
+              </Label>
+            </RadioGroup>
+        </div>
 
-        <Button variant="ghost" asChild className="mb-6">
-          <Link to="/">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Voltar ao Início
-          </Link>
-        </Button>
+        {/* Escopo */}
+        <div className="rounded-lg border bg-card p-6 mb-6">
+          <h2 className="font-semibold mb-4">Escopo</h2>
+          <RadioGroup
+            value={escopo}
+            onValueChange={v => setEscopo(v as SugestaoEscopo)}
+            className="flex flex-wrap gap-8"
+          >
+            <Label className="flex items-center gap-2 cursor-pointer">
+              <RadioGroupItem value="area" /> Área
+            </Label>
+            <Label className="flex items-center gap-2 cursor-pointer">
+              <RadioGroupItem value="processo" /> Processo
+            </Label>
+            <Label className="flex items-center gap-2 cursor-pointer">
+              <RadioGroupItem value="subprocesso" /> Subprocesso
+            </Label>
+            <Label className="flex items-center gap-2 cursor-pointer">
+              <RadioGroupItem value="servico" /> Serviço
+            </Label>
+          </RadioGroup>
+        </div>
 
-        <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-8">
-            <div className="flex items-center justify-center space-x-2 mb-4">
-              <Lightbulb className="h-8 w-8 text-primary" />
-              <h1 className="text-3xl font-bold text-foreground">Nova Sugestão</h1>
-            </div>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Sugira novos serviços ou a edição de um serviço existente. As informações
-              serão avaliadas antes de publicação no catálogo.
-            </p>
+        {/* Hierarquia */}
+        <div className="rounded-lg border bg-card p-6 mb-6">
+          <h2 className="font-semibold mb-4">Hierarquia</h2>
+          <div className="grid gap-4 md:grid-cols-2">
+            {/* Área */}
+            {(modo === "edicao" && escopo === "area") ||
+            (modo === "novo" && precisaArea) ||
+            (modo === "edicao" && escopo !== "area") ? (
+              renderSelect(
+                "Área" + (modo === "edicao" && escopo === "area" ? " (alvo)" : ""),
+                areaId,
+                v => {
+                  setAreaId(v);
+                  setProcessoId("");
+                  setSubprocessoId("");
+                  setServicoId("");
+                },
+                areas,
+                "Selecionar",
+                modo === "novo" && escopo === "area" // quando criando nova área não precisa escolher outra
+              )
+            ) : null}
+
+            {/* Processo */}
+            {(modo === "edicao" && escopo === "processo") ||
+            (modo === "novo" && precisaProcesso) ||
+            (modo === "edicao" && escopo.includes("processo") && escopo !== "processo") ||
+            (modo === "edicao" && (escopo === "subprocesso" || escopo === "servico")) ? (
+              renderSelect(
+                "Processo" + (edicaoAlvoProcesso ? " (alvo)" : ""),
+                processoId,
+                v => {
+                  setProcessoId(v);
+                  setSubprocessoId("");
+                  setServicoId("");
+                },
+                processos,
+                "Selecionar",
+                (modo === "novo" && escopo === "processo") || !areaId
+              )
+            ) : null}
+
+            {/* Subprocesso */}
+            {(modo === "edicao" && escopo === "subprocesso") ||
+            (modo === "novo" && precisaSubprocesso) ||
+            (modo === "edicao" && escopo === "servico") ? (
+              renderSelect(
+                "Subprocesso" + (edicaoAlvoSub ? " (alvo)" : ""),
+                subprocessoId,
+                v => {
+                  setSubprocessoId(v);
+                  setServicoId("");
+                },
+                subprocessos,
+                "Selecionar",
+                (modo === "novo" && escopo === "subprocesso") || !processoId
+              )
+            ) : null}
+
+            {/* Serviço */}
+            {escopo === "servico" ? renderSelect(
+              "Serviço" + (edicaoAlvoServico ? " (alvo)" : ""),
+              servicoId,
+              v => setServicoId(v),
+              servicos.map(s => ({ id: s.id, nome: s.produto })),
+              "Selecionar",
+              (modo === "novo" && escopo === "servico") || !subprocessoId
+            ) : null}
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-8">
-            {/* Tipo */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Tipo de Sugestão *</CardTitle>
-                <CardDescription>
-                  Escolha entre criação de novo serviço ou edição de um existente.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <RadioGroup
-                  value={tipoSugestao}
-                  onValueChange={(val) => setTipoSugestao(normalizeTipo(val))}
-                  className="flex flex-col space-y-3"
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="novo" id="novo" />
-                    <Label htmlFor="novo">Novo Serviço</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="edicao" id="edicao" />
-                    <Label htmlFor="edicao">Edição de Serviço Existente</Label>
-                  </div>
-                </RadioGroup>
-              </CardContent>
-            </Card>
-
-            {/* Básico */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Informações Básicas</CardTitle>
-                <CardDescription>Campos essenciais do serviço.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="produto">Produto / Serviço *</Label>
-                    <Input
-                      id="produto"
-                      value={formData.produto}
-                      placeholder="Ex: Cadastro de Novo Colaborador"
-                      onChange={(e) => updateField("produto", e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="area">Área *</Label>
-                    <Select
-                      value={formData.area}
-                      onValueChange={(v) => updateField("area", v)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione a área" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {mockAreas.map(a => (
-                          <SelectItem key={a} value={a}>{a}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="processo">Processo</Label>
-                    <Input
-                      id="processo"
-                      value={formData.processo}
-                      placeholder="Ex: Onboarding"
-                      onChange={(e) => updateField("processo", e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="subprocesso">Subprocesso</Label>
-                    <Input
-                      id="subprocesso"
-                      value={formData.subprocesso}
-                      placeholder="Ex: Admissão"
-                      onChange={(e) => updateField("subprocesso", e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Tipo de Execução</Label>
-                  <Select
-                    value={formData.demandaRotina}
-                    onValueChange={(v) => updateField("demandaRotina", v)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Demanda ou Rotina" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Demanda">Demanda</SelectItem>
-                      <SelectItem value="Rotina">Rotina</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Descrição */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Descrição do Serviço</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="oQueE">O que é *</Label>
-                  <Textarea
-                    id="oQueE"
-                    className="min-h-[100px]"
-                    placeholder="Explique o objetivo e escopo do serviço..."
-                    value={formData.oQueE}
-                    onChange={(e) => updateField("oQueE", e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="quemPodeUtilizar">Quem pode utilizar</Label>
-                  <Textarea
-                    id="quemPodeUtilizar"
-                    value={formData.quemPodeUtilizar}
-                    placeholder="Ex: Gestores de RH"
-                    onChange={(e) => updateField("quemPodeUtilizar", e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="requisitosOperacionais">Requisitos Operacionais</Label>
-                  <Textarea
-                    id="requisitosOperacionais"
-                    value={formData.requisitosOperacionais}
-                    placeholder="Listar acessos, documentos necessários..."
-                    onChange={(e) => updateField("requisitosOperacionais", e.target.value)}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* SLA / Métricas */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Métricas e Acordos</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="tempoMedioValor">Tempo Médio (valor)</Label>
-                    <Input
-                      id="tempoMedioValor"
-                      value={formData.tempoMedioValor}
-                      placeholder="Ex: 2"
-                      onChange={(e) => updateField("tempoMedioValor", e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="tempoMedioUnidade">Tempo Médio (unidade)</Label>
-                    <Input
-                      id="tempoMedioUnidade"
-                      value={formData.tempoMedioUnidade}
-                      placeholder="Ex: dias"
-                      onChange={(e) => updateField("tempoMedioUnidade", e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="unidadeMedida">Unidade de Medida (geral)</Label>
-                    <Input
-                      id="unidadeMedida"
-                      value={formData.unidadeMedida}
-                      placeholder="Ex: dias úteis"
-                      onChange={(e) => updateField("unidadeMedida", e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="sla">SLA</Label>
-                    <Input
-                      id="sla"
-                      value={formData.sla}
-                      placeholder="Ex: 5 (dias)"
-                      onChange={(e) => updateField("sla", e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="sli">SLI (%)</Label>
-                    <Input
-                      id="sli"
-                      value={formData.sli}
-                      placeholder="Ex: 95"
-                      onChange={(e) => updateField("sli", e.target.value)}
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Observações / Justificativas */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Informações Adicionais</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="observacoes">Observações</Label>
-                  <Textarea
-                    id="observacoes"
-                    value={formData.observacoes}
-                    placeholder="Observações relevantes..."
-                    onChange={(e) => updateField("observacoes", e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="justificativa">Justificativa</Label>
-                  <Textarea
-                    id="justificativa"
-                    className="min-h-[100px]"
-                    value={formData.justificativa}
-                    placeholder="Explique por que essa sugestão é importante..."
-                    onChange={(e) => updateField("justificativa", e.target.value)}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Ações */}
-            <div className="flex justify-end space-x-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  resetForm();
-                  navigate("/");
-                }}
-              >
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={submitting}>
-                {submitting ? "Enviando..." : (
-                  <>
-                    <Send className="mr-2 h-4 w-4" />
-                    Enviar Sugestão
-                  </>
-                )}
-              </Button>
-            </div>
-          </form>
+          {erroHierarquia && (
+            <p className="mt-4 text-sm text-red-600">{erroHierarquia}</p>
+          )}
         </div>
-      </main>
+
+        {/* Dados Atuais (snapshot) */}
+        {modo === "edicao" && snapshot && (
+          <div className="rounded-lg border bg-card p-6 mb-6">
+            <h2 className="font-semibold mb-4">Dados Atuais</h2>
+            <pre className="text-xs bg-muted p-3 rounded max-h-64 overflow-auto">
+              {JSON.stringify(snapshot, null, 2)}
+            </pre>
+          </div>
+        )}
+
+        {/* Detalhes */}
+        <div className="rounded-lg border bg-card p-6 mb-6">
+          <h2 className="font-semibold mb-4">Detalhes da Sugestão</h2>
+          <div className="space-y-4">
+            <div>
+              <Label className="text-sm font-medium">{nomeSugLabelMap[escopo]}</Label>
+              <Input
+                value={nomeSugerido}
+                onChange={e => setNomeSugerido(e.target.value)}
+                placeholder={
+                  {
+                    area: "Ex: Operações",
+                    processo: "Ex: Contas a Pagar",
+                    subprocesso: "Ex: Triagem de Currículos",
+                    servico: "Ex: Publicação de Vaga Interna"
+                  }[escopo]
+                }
+              />
+            </div>
+            <div>
+              <Label className="text-sm font-medium">Descrição / Observação</Label>
+              <Textarea
+                value={descricao}
+                onChange={e => setDescricao(e.target.value)}
+                placeholder="Detalhe a sugestão..."
+                rows={3}
+              />
+            </div>
+            <div>
+              <Label className="text-sm font-medium">
+                Observações adicionais (opcional)
+              </Label>
+              <Textarea
+                value={observacoes}
+                onChange={e => setObservacoes(e.target.value)}
+                placeholder="Complementos, riscos, dependências..."
+                rows={3}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Justificativa */}
+        <div className="rounded-lg border bg-card p-6 mb-8">
+          <h2 className="font-semibold mb-4">Justificativa *</h2>
+            <Textarea
+              value={justificativa}
+              onChange={e => setJustificativa(e.target.value)}
+              placeholder="Explique o motivo / benefício / urgência..."
+              rows={4}
+            />
+        </div>
+
+        <div className="flex justify-end gap-4">
+          <Button
+            variant="outline"
+            onClick={() => navigate("/")}
+            disabled={carregando}
+          >
+            Cancelar
+          </Button>
+          <Button onClick={handleSubmit} disabled={!!erroHierarquia || carregando}>
+            {carregando ? "Enviando..." : "Enviar Sugestão"}
+          </Button>
+        </div>
+      </div>
+
+      {/* Modal Sucesso */}
+      <Dialog open={!!sucessoId} onOpenChange={o => !o && setSucessoId(null)}>
+        <DialogContent className="sm:max-w-md">
+          <h3 className="text-xl font-semibold mb-2">Sugestão enviada!</h3>
+          <p className="text-sm text-muted-foreground mb-6">
+            Sua sugestão foi registrada com status <strong>pendente</strong>. Em breve será
+            avaliada.
+          </p>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={limparParaNova}>
+              Enviar outra
+            </Button>
+            <Button
+              onClick={() => {
+                const id = sucessoId!;
+                setSucessoId(null);
+                navigate(`/sugestoes/${id}`);
+              }}
+            >
+              Ver sugestão
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
-}
+};
+
+export default NovaSugestao;
