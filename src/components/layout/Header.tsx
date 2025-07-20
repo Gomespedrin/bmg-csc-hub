@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, User, Settings, LogOut } from "lucide-react";
+import { Search, User, Settings, LogOut, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -106,6 +106,12 @@ export function Header() {
                 <DropdownMenuItem>
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Configurações</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/admin/sugestoes">
+                    <Shield className="mr-2 h-4 w-4" />
+                    <span>Admin - Sugestões</span>
+                  </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="text-destructive" onClick={handleSignOut}>

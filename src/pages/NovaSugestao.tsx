@@ -8,8 +8,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ArrowLeft, Send, FileText, Lightbulb } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { useCreateSugestao } from "@/hooks/useSugestoes";
+import { useAreas } from "@/hooks/useAreas";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -21,6 +23,10 @@ import {
 
 export default function NovaSugestao() {
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const createSugestao = useCreateSugestao();
+  const { data: areas } = useAreas();
+  
   const [tipoSugestao, setTipoSugestao] = useState("");
   const [formData, setFormData] = useState({
     produto: "",
@@ -39,16 +45,7 @@ export default function NovaSugestao() {
     justificativa: ""
   });
 
-  const mockAreas = [
-    "Recursos Humanos",
-    "Tecnologia da Informação", 
-    "Financeiro",
-    "Jurídico",
-    "Compliance",
-    "Operações"
-  ];
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Basic validation
@@ -61,30 +58,36 @@ export default function NovaSugestao() {
       return;
     }
 
-    // Simulate submission
-    toast({
-      title: "Sugestão enviada!",
-      description: "Sua sugestão foi enviada para análise e você receberá um retorno em breve.",
-    });
+    try {
+      // Convert numeric fields
+      const dadosSugeridos = {
+        ...formData,
+        tempo_medio: formData.tempoMedio ? parseInt(formData.tempoMedio) : null,
+        sla: formData.sla ? parseInt(formData.sla) : null,
+        sli: formData.sli ? parseFloat(formData.sli) : null,
+      };
 
-    // Reset form
-    setTipoSugestao("");
-    setFormData({
-      produto: "",
-      area: "",
-      processo: "",
-      subprocesso: "",
-      demandaRotina: "",
-      oQueE: "",
-      quemPodeUtilizar: "",
-      tempoMedio: "",
-      unidadeMedida: "",
-      sla: "",
-      sli: "",
-      requisitosOperacionais: "",
-      observacoes: "",
-      justificativa: ""
-    });
+      await createSugestao.mutateAsync({
+        tipo: tipoSugestao,
+        dados_sugeridos: dadosSugeridos,
+        justificativa: formData.justificativa
+      });
+
+      toast({
+        title: "Sugestão enviada!",
+        description: "Sua sugestão foi enviada para análise e você receberá um retorno em breve.",
+      });
+
+      // Navigate back to home
+      navigate('/');
+      
+    } catch (error) {
+      toast({
+        title: "Erro ao enviar sugestão",
+        description: "Ocorreu um erro ao enviar sua sugestão. Tente novamente.",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -179,8 +182,8 @@ export default function NovaSugestao() {
                         <SelectValue placeholder="Selecione a área" />
                       </SelectTrigger>
                       <SelectContent>
-                        {mockAreas.map(area => (
-                          <SelectItem key={area} value={area}>{area}</SelectItem>
+                        {areas?.map(area => (
+                          <SelectItem key={area.id} value={area.nome}>{area.nome}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
