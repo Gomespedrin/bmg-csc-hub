@@ -34,9 +34,10 @@ export default function AdminSugestoes() {
       setComentarioAdmin("");
       setSelectedSugestao(null);
     } catch (error) {
+      console.error('Erro ao aprovar:', error);
       toast({
         title: "Erro",
-        description: "Erro ao aprovar sugestão.",
+        description: "Erro ao aprovar sugestão. Verifique se você está logado.",
         variant: "destructive"
       });
     }
@@ -58,9 +59,10 @@ export default function AdminSugestoes() {
       setComentarioAdmin("");
       setSelectedSugestao(null);
     } catch (error) {
+      console.error('Erro ao rejeitar:', error);
       toast({
         title: "Erro",
-        description: "Erro ao rejeitar sugestão.",
+        description: "Erro ao rejeitar sugestão. Verifique se você está logado.",
         variant: "destructive"
       });
     }

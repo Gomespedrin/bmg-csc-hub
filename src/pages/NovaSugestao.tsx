@@ -25,7 +25,7 @@ export default function NovaSugestao() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const createSugestao = useCreateSugestao();
-  const { data: areas } = useAreas();
+  const { data: areas, isLoading: areasLoading } = useAreas();
   
   const [tipoSugestao, setTipoSugestao] = useState("");
   const [formData, setFormData] = useState({
@@ -179,12 +179,18 @@ export default function NovaSugestao() {
                     <Label htmlFor="area">Área *</Label>
                     <Select value={formData.area} onValueChange={(value) => setFormData({...formData, area: value})}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Selecione a área" />
+                        <SelectValue placeholder={areasLoading ? "Carregando..." : "Selecione a área"} />
                       </SelectTrigger>
                       <SelectContent>
-                        {areas?.map(area => (
-                          <SelectItem key={area.id} value={area.nome}>{area.nome}</SelectItem>
-                        ))}
+                        {areasLoading ? (
+                          <SelectItem value="" disabled>Carregando áreas...</SelectItem>
+                        ) : areas?.length ? (
+                          areas.map(area => (
+                            <SelectItem key={area.id} value={area.nome}>{area.nome}</SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="" disabled>Nenhuma área encontrada</SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
