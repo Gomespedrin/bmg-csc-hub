@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Header } from "@/components/layout/Header";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -158,8 +158,7 @@ export default function AdminSugestoes() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <Header />
-        <main className="container mx-auto px-6 py-8">
+              <main className="container mx-auto px-6 py-8">
           <div className="flex items-center justify-center h-64">
             <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
           </div>
@@ -170,8 +169,6 @@ export default function AdminSugestoes() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
-      
       <main className="container mx-auto px-6 py-8">
         <div className="flex items-center justify-between mb-8">
           <div>

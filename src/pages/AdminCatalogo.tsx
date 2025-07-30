@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Header } from "@/components/layout/Header";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -69,8 +69,7 @@ export default function AdminCatalogo() {
   if (!isAdminLoading && !isAdmin) {
     return (
       <div className="min-h-screen bg-background">
-        <Header />
-        <main className="container mx-auto px-6 py-8">
+              <main className="container mx-auto px-6 py-8">
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
               <AlertCircle className="h-12 w-12 text-destructive mb-4" />
@@ -218,8 +217,6 @@ export default function AdminCatalogo() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
-      
       <div className="flex">
         {/* Menu Lateral */}
         <aside className="w-64 bg-card border-r min-h-screen">

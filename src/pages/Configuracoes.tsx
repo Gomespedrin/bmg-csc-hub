@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Header } from "@/components/layout/Header";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -52,7 +52,8 @@ export default function Configuracoes() {
   const [appearance, setAppearance] = useState({
     theme: 'system' as const,
     compactMode: false,
-    showAnimations: true
+    showAnimations: true,
+    sidebarPinned: true
   });
 
   const [language, setLanguage] = useState('pt-BR');
@@ -104,7 +105,6 @@ export default function Configuracoes() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
       <main className="container mx-auto px-6 py-8">
         <div className="max-w-4xl mx-auto space-y-6">
           {/* Cabeçalho */}
@@ -327,6 +327,21 @@ export default function Configuracoes() {
                   checked={appearance.showAnimations}
                   onCheckedChange={(checked) => 
                     setAppearance({ ...appearance, showAnimations: checked })
+                  }
+                />
+              </div>
+              <Separator />
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-base">Menu lateral fixo</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Mantém o menu lateral sempre visível
+                  </p>
+                </div>
+                <Switch
+                  checked={appearance.sidebarPinned}
+                  onCheckedChange={(checked) => 
+                    setAppearance({ ...appearance, sidebarPinned: checked })
                   }
                 />
               </div>

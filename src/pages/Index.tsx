@@ -1,5 +1,4 @@
-import { Header } from "@/components/layout/Header";
-import { SearchBar } from "@/components/search/SearchBar";
+
 import { ServiceCard } from "@/components/services/ServiceCard";
 import { AreaCard } from "@/components/areas/AreaCard";
 import { Button } from "@/components/ui/button";
@@ -37,8 +36,6 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
-      
       {/* Hero Section */}
       <section 
         className="relative py-16 lg:py-24 bg-cover bg-center bg-no-repeat"
@@ -54,20 +51,6 @@ const Index = () => {
             Centralize, consulte e gerencie todos os serviços do Centro de Serviços Compartilhados do Grupo BMG
           </p>
           
-          {/* Main Search */}
-          <div className="max-w-2xl mx-auto mb-8">
-            <SearchBar 
-              placeholder="Buscar serviços, processos, áreas..."
-              className="w-full"
-              onSearchChange={(value) => {
-                if (value.trim()) {
-                  // Navegar para a página de serviços com o termo de busca
-                  window.location.href = `/servicos?busca=${encodeURIComponent(value.trim())}`;
-                }
-              }}
-            />
-          </div>
-
           {/* Quick Actions */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button asChild size="lg" className="glow-primary">

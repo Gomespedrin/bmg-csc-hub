@@ -1,13 +1,14 @@
+import React from "react";
 import { useParams, Link } from "react-router-dom";
-import { Header } from "@/components/layout/Header";
 import { ServiceCard } from "@/components/services/ServiceCard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Settings, Clock, Target, Users, FileText, AlertCircle, CheckCircle } from "lucide-react";
+import { ArrowLeft, Building2, Package, Users, Clock, Target, TrendingUp, FileText, Settings, Zap, FolderOpen } from "lucide-react";
 import { useServicos } from "@/hooks/useServicos";
 import { useAreas } from "@/hooks/useAreas";
+import { createAreaUrl, createProcessoUrl, createServicoUrl, extractIdFromSlug } from "@/lib/utils";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -19,40 +20,49 @@ import {
 
 export default function SubprocessoDetalhe() {
   const { processoId, subprocessoId } = useParams();
-  const { data: servicosData, isLoading } = useServicos();
   const { data: areas } = useAreas();
+  const { data: servicosData } = useServicos();
 
-  console.log("🔍 SubprocessoDetalhe - Parâmetros:", { processoId, subprocessoId });
+  // Extrair os IDs dos slugs usando a função existente
+  const extractedProcessoId = processoId ? extractIdFromSlug(processoId) : '';
+  const extractedSubprocessoId = subprocessoId ? extractIdFromSlug(subprocessoId) : '';
 
-  // Encontrar o subprocesso específico
+  console.log("🔍 SubprocessoDetalhe - Parâmetros:", { 
+    processoId, 
+    subprocessoId,
+    extractedProcessoId,
+    extractedSubprocessoId
+  });
+
+  // Encontrar o subprocesso específico pelo ID extraído
   const subprocesso = areas?.flatMap(area => 
     area.processos?.flatMap(processo => 
-      processo.subprocessos?.map(sub => ({
-        ...sub,
+      processo.subprocessos?.map(subprocesso => ({
+        ...subprocesso,
         processo: processo,
         area: area
       })) || []
     ) || []
-  ).find(sub => sub.id === subprocessoId);
+  ).find(sub => sub.id === extractedSubprocessoId);
 
   console.log("🔍 SubprocessoDetalhe - Subprocesso encontrado:", subprocesso);
 
-  // Filtrar serviços do subprocesso
+  // Filtrar serviços deste subprocesso
   const servicos = (servicosData as any)?.services || [];
-  const servicosDoSubprocesso = servicos.filter((servico: any) => 
-    servico.subprocesso.id === subprocessoId
-  );
+  const servicosDoSubprocesso = servicos.filter((servico: any) => {
+    const servicoSubprocessoId = servico.subprocesso?.id;
+    return servicoSubprocessoId === extractedSubprocessoId;
+  });
 
   console.log("🔍 SubprocessoDetalhe - Serviços:", {
     totalServicos: servicos.length,
     servicosDoSubprocesso: servicosDoSubprocesso.length,
-    subprocessoId
+    subprocessoId: subprocesso?.id
   });
 
-  if (isLoading) {
+  if (!subprocesso) {
     return (
       <div className="min-h-screen bg-background">
-        <Header />
         <main className="container mx-auto px-6 py-8">
           <div className="text-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
@@ -66,7 +76,6 @@ export default function SubprocessoDetalhe() {
   if (!subprocesso) {
     return (
       <div className="min-h-screen bg-background">
-        <Header />
         <main className="container mx-auto px-6 py-8">
           <div className="text-center py-12">
             <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -103,8 +112,6 @@ export default function SubprocessoDetalhe() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
-      
       <main className="container mx-auto px-6 py-8">
         {/* Breadcrumb */}
         <Breadcrumb className="mb-6">
@@ -117,13 +124,13 @@ export default function SubprocessoDetalhe() {
             <BreadcrumbSeparator />
             <BreadcrumbItem>
               <BreadcrumbLink asChild>
-                <Link to={`/areas/${area?.id}`}>{area?.nome}</Link>
+                <Link to={createAreaUrl(area?.nome || '', area?.id || '')}>{area?.nome}</Link>
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
               <BreadcrumbLink asChild>
-                <Link to={`/processos/${processo?.id}`}>{processo?.nome}</Link>
+                <Link to={createProcessoUrl(processo?.nome || '', processo?.id || '')}>{processo?.nome}</Link>
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
@@ -144,33 +151,32 @@ export default function SubprocessoDetalhe() {
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-start justify-between mb-6">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground mb-2">
-                {subprocesso.nome}
-              </h1>
-              <p className="text-lg text-muted-foreground mb-4">
-                {subprocesso.descricao || 'Subprocesso do ' + processo?.nome}
-              </p>
-              
-              {/* Stats */}
-              <div className="flex items-center space-x-6">
-                <div className="flex items-center space-x-2">
-                  <Settings className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">
-                    {formattedServicos.length} serviço{formattedServicos.length !== 1 ? 's' : ''}
-                  </span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">
-                    Processo: {processo?.nome}
-                  </span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Target className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">
-                    Área: {area?.nome}
-                  </span>
+            <div className="flex items-center space-x-4">
+              <div className="w-16 h-16 bg-primary/10 rounded-lg flex items-center justify-center">
+                <FolderOpen className="h-8 w-8 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-foreground mb-2">
+                  {subprocesso.nome}
+                </h1>
+                <p className="text-lg text-muted-foreground mb-4">
+                  {subprocesso.descricao || 'Subprocesso da área ' + area?.nome}
+                </p>
+                
+                {/* Stats */}
+                <div className="flex items-center space-x-6">
+                  <div className="flex items-center space-x-2">
+                    <Package className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">
+                      {formattedServicos.length} serviço{formattedServicos.length !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">
+                      Área: {area?.nome} {'>'} {processo?.nome}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -180,7 +186,7 @@ export default function SubprocessoDetalhe() {
         {/* Services Grid */}
         {formattedServicos.length === 0 ? (
           <div className="text-center py-12">
-            <FileText className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+            <FolderOpen className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-semibold mb-2">Nenhum serviço encontrado</h3>
             <p className="text-muted-foreground">
               Este subprocesso não possui serviços cadastrados.
@@ -189,10 +195,7 @@ export default function SubprocessoDetalhe() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {formattedServicos.map((servico) => (
-              <ServiceCard
-                key={servico.id}
-                service={servico}
-              />
+              <ServiceCard key={servico.id} service={servico} />
             ))}
           </div>
         )}

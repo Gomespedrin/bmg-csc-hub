@@ -1,94 +1,65 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Header } from "@/components/layout/Header";
-import { SearchBar } from "@/components/search/SearchBar";
-import { HorizontalFilterPanel } from "@/components/filters/HorizontalFilterPanel";
 import { ServiceCard } from "@/components/services/ServiceCard";
-import { ViewOptions, ViewMode } from "@/components/ui/view-options";
 import { Button } from "@/components/ui/button";
-import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Filter, Grid3X3, List, Square } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { 
+  Search, 
+  Filter, 
+  Grid3X3, 
+  List, 
+  ArrowLeft, 
+  ArrowRight,
+  Package,
+  Clock,
+  Target,
+  TrendingUp
+} from "lucide-react";
 import { useServicos } from "@/hooks/useServicos";
+import { useAreas } from "@/hooks/useAreas";
+import { GlobalSearch } from "@/components/search/GlobalSearch";
 
-export default function Servicos() {
+const Servicos = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [showFilters, setShowFilters] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>("grid");
-  const [showDetails, setShowDetails] = useState(false);
-
-  // Inicializar filtros a partir da URL
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [filters, setFilters] = useState({
-    areas: searchParams.get("areas")?.split(",").filter(Boolean) || [],
-    processos: searchParams.get("processos")?.split(",").filter(Boolean) || [],
-    subprocessos: searchParams.get("subprocessos")?.split(",").filter(Boolean) || [],
-    produto: searchParams.get("produto") || "",
-    demandaRotina: searchParams.get("demandaRotina") || "todos",
-    status: searchParams.get("status")?.split(",").filter(Boolean) || [],
+    area: '',
+    status: '',
+    demandaRotina: ''
   });
 
-  const searchTerm = searchParams.get("busca") || "";
-  const currentPage = parseInt(searchParams.get("page") || "1");
+  const { data: servicosData, isLoading } = useServicos();
+  const { data: areas } = useAreas();
 
-  // Buscar serviços com filtros
-  const { data: servicosData, isLoading } = useServicos({
-    ...filters,
-    busca: searchTerm,
-    page: currentPage,
-    pageSize: 20,
-    showAll: true // Mostrar todos os serviços
-  });
-
+  // Extrair dados dos serviços
   const servicos = (servicosData as any)?.services || [];
-  const totalItems = (servicosData as any)?.totalItems || 0;
-  const totalPages = (servicosData as any)?.totalPages || 1;
+  const totalServicos = (servicosData as any)?.totalItems || 0;
 
-  // Atualizar URL quando filtros mudarem
-  useEffect(() => {
-    const params = new URLSearchParams();
-    
-    if (filters.areas.length > 0) params.set("areas", filters.areas.join(","));
-    if (filters.processos.length > 0) params.set("processos", filters.processos.join(","));
-    if (filters.subprocessos.length > 0) params.set("subprocessos", filters.subprocessos.join(","));
-    if (filters.produto) params.set("produto", filters.produto);
-    if (filters.demandaRotina !== "todos") params.set("demandaRotina", filters.demandaRotina);
-    if (filters.status.length > 0) params.set("status", filters.status.join(","));
-    if (searchTerm) params.set("busca", searchTerm);
-    if (currentPage > 1) params.set("page", currentPage.toString());
+  // Aplicar filtros
+  const filteredServicos = servicos.filter((servico: any) => {
+    const searchTerm = searchParams.get('busca')?.toLowerCase() || '';
+    const areaFilter = filters.area;
+    const statusFilter = filters.status;
+    const demandaRotinaFilter = filters.demandaRotina;
 
-    setSearchParams(params, { replace: true });
-  }, [filters, searchTerm, currentPage, setSearchParams]);
+    const matchesSearch = !searchTerm || 
+      servico.produto.toLowerCase().includes(searchTerm) ||
+      servico.subprocesso?.nome.toLowerCase().includes(searchTerm) ||
+      servico.subprocesso?.processo?.nome.toLowerCase().includes(searchTerm) ||
+      servico.subprocesso?.processo?.area?.nome.toLowerCase().includes(searchTerm);
 
-  const handleFiltersChange = (newFilters: any) => {
-    setFilters(newFilters);
-    // Reset para página 1 quando filtros mudarem
-    if (currentPage !== 1) {
-      setSearchParams(prev => {
-        const params = new URLSearchParams(prev);
-        params.delete("page");
-        return params;
-      }, { replace: true });
-    }
-  };
+    const matchesArea = !areaFilter || servico.subprocesso?.processo?.area?.nome === areaFilter;
+    const matchesStatus = !statusFilter || servico.status === statusFilter;
+    const matchesDemandaRotina = !demandaRotinaFilter || servico.demanda_rotina === demandaRotinaFilter;
 
-  const handlePageChange = (page: number) => {
-    setSearchParams(prev => {
-      const params = new URLSearchParams(prev);
-      params.set("page", page.toString());
-      return params;
-    }, { replace: true });
-  };
-
-  const activeFiltersCount = 
-    filters.areas.length + 
-    filters.processos.length + 
-    filters.subprocessos.length + 
-    (filters.produto ? 1 : 0) + 
-    (filters.demandaRotina !== "todos" ? 1 : 0) + 
-    filters.status.length;
+    return matchesSearch && matchesArea && matchesStatus && matchesDemandaRotina;
+  });
 
   // Formatar serviços para ServiceCard
-  const formattedServicos = servicos.map((servico: any) => ({
+  const formattedServicos = filteredServicos.map((servico: any) => ({
     id: servico.id,
     produto: servico.produto,
     subprocesso: servico.subprocesso.nome,
@@ -97,185 +68,174 @@ export default function Servicos() {
     tempoMedio: servico.tempo_medio ? `${Math.ceil(servico.tempo_medio / 60)} dias` : '1 dia',
     sla: servico.sla ? `${servico.sla} horas` : '24 horas',
     status: (servico.status === 'ativo' ? 'Ativo' : 'Inativo') as "Ativo" | "Inativo",
-    demandaRotina: (servico.demanda_rotina as "Demanda" | "Rotina") || 'Demanda',
-    subprocessoId: servico.subprocesso.id,
-    processoId: servico.subprocesso.processo.id
+    demandaRotina: (servico.demanda_rotina as "Demanda" | "Rotina") || 'Demanda'
   }));
 
-  const getGridClass = () => {
-    switch (viewMode) {
-      case "grid":
-        return "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6";
-      case "list":
-        return "space-y-4";
-      case "compact":
-        return "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4";
-      case "detailed":
-        return "grid grid-cols-1 lg:grid-cols-2 gap-8";
-      default:
-        return "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6";
-    }
+  // Estatísticas
+  const stats = {
+    total: totalServicos,
+    ativos: servicos.filter((s: any) => s.status === 'ativo').length,
+    areas: new Set(servicos.map((s: any) => s.subprocesso?.processo?.area?.nome)).size,
+    tempoMedio: '2.5 horas'
   };
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
-      
-      <main className="container mx-auto px-6 py-8">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">
-            Catálogo de Serviços
-          </h1>
-          <p className="text-lg text-muted-foreground mb-6">
+      <div className="bg-card border-b">
+        <div className="container mx-auto px-6 py-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">Catálogo de Serviços</h1>
+              <p className="text-muted-foreground">
             Explore todos os serviços disponíveis organizados por área, processo e subprocesso.
           </p>
-          
-          {/* Stats */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="text-sm text-muted-foreground">
-              Mostrando {servicos.length} de {totalItems} serviços (página {currentPage} de {totalPages})
             </div>
-            
-            {/* View Controls */}
             <div className="flex items-center space-x-2">
-              <ViewOptions
-                viewMode={viewMode}
-                onViewModeChange={setViewMode}
-                showDetails={showDetails}
-                onShowDetailsChange={setShowDetails}
-              />
-              
               <Button
-                variant="outline"
+                variant={viewMode === 'grid' ? 'default' : 'outline'}
                 size="sm"
-                onClick={() => setShowFilters(!showFilters)}
-                className="h-8"
+                onClick={() => setViewMode('grid')}
               >
-                <Filter className="h-4 w-4 mr-2" />
-                Filtros
-                {activeFiltersCount > 0 && (
-                  <Badge variant="secondary" className="ml-2 bg-primary/10 text-primary border-primary/20">
-                    {activeFiltersCount}
-                  </Badge>
-                )}
+                <Grid3X3 className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={viewMode === 'list' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setViewMode('list')}
+              >
+                <List className="h-4 w-4" />
               </Button>
             </div>
           </div>
 
-          {/* Search Bar */}
-          <div className="mb-6">
-            <SearchBar 
+          {/* Search and Filters */}
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
+              <GlobalSearch 
               placeholder="Buscar serviços, processos, áreas..."
-              className="w-full max-w-2xl"
-              onSearchChange={(value) => {
-                setSearchParams(prev => {
-                  const params = new URLSearchParams(prev);
-                  if (value) {
-                    params.set("busca", value);
-                  } else {
-                    params.delete("busca");
-                  }
-                  return params;
-                }, { replace: true });
-              }}
-            />
-          </div>
-
-          {/* Horizontal Filters */}
-          {showFilters && (
-            <div className="mb-6">
-              <HorizontalFilterPanel
-                filters={filters}
-                onFiltersChange={handleFiltersChange}
+                className="w-full"
               />
             </div>
-          )}
+            <div className="flex items-center space-x-2">
+              <Button variant="outline" size="sm">
+                <Filter className="mr-2 h-4 w-4" />
+                Filtros
+              </Button>
+              <Button variant="outline" size="sm">
+                Visualizar
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="container mx-auto px-6 py-8">
+        {/* Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Package className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{stats.total}</p>
+                  <p className="text-sm text-muted-foreground">Total de Serviços</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center">
+                  <Target className="h-5 w-5 text-green-500" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{stats.ativos}</p>
+                  <p className="text-sm text-muted-foreground">Serviços Ativos</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-lg bg-secondary/10 flex items-center justify-center">
+                  <TrendingUp className="h-5 w-5 text-secondary" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{stats.areas}</p>
+                  <p className="text-sm text-muted-foreground">Áreas Atendidas</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center">
+                  <Clock className="h-5 w-5 text-accent" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{stats.tempoMedio}</p>
+                  <p className="text-sm text-muted-foreground">Tempo Médio</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Services Grid */}
+        {/* Results Info */}
+        <div className="flex items-center justify-between mb-6">
+          <p className="text-sm text-muted-foreground">
+            Mostrando {formattedServicos.length} de {totalServicos} serviços 
+            {searchParams.get('busca') && ` para "${searchParams.get('busca')}"`}
+          </p>
+        </div>
+
+        {/* Services Grid/List */}
         {isLoading ? (
           <div className="text-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
             <p className="mt-4 text-muted-foreground">Carregando serviços...</p>
           </div>
-        ) : servicos.length === 0 ? (
-          <div className="text-center py-12">
-            <Square className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Nenhum serviço encontrado</h3>
-            <p className="text-muted-foreground">
-              Tente ajustar os filtros ou termo de busca para encontrar o que procura.
-            </p>
+        ) : formattedServicos.length > 0 ? (
+          <div className={viewMode === 'grid' 
+            ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" 
+            : "space-y-4"
+          }>
+            {formattedServicos.map(servico => (
+              <ServiceCard key={servico.id} service={servico} />
+            ))}
           </div>
         ) : (
-          <>
-            <div className={getGridClass()}>
-              {formattedServicos.map((servico) => (
-                <ServiceCard
-                  key={servico.id}
-                  service={servico}
-                />
-              ))}
-            </div>
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="mt-8">
-                <Pagination>
-                  <PaginationContent>
-                    <PaginationItem>
-                      <PaginationPrevious 
-                        onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
-                        className={currentPage <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                      />
-                    </PaginationItem>
-                    
-                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                      const page = i + 1;
-                      return (
-                        <PaginationItem key={page}>
-                          <PaginationLink
-                            onClick={() => handlePageChange(page)}
-                            isActive={currentPage === page}
-                            className="cursor-pointer"
-                          >
-                            {page}
-                          </PaginationLink>
-                        </PaginationItem>
-                      );
-                    })}
-                    
-                    {totalPages > 5 && currentPage < totalPages - 2 && (
-                      <PaginationItem>
-                        <PaginationEllipsis />
-                      </PaginationItem>
-                    )}
-                    
-                    {totalPages > 5 && (
-                      <PaginationItem>
-                        <PaginationLink
-                          onClick={() => handlePageChange(totalPages)}
-                          isActive={currentPage === totalPages}
-                          className="cursor-pointer"
-                        >
-                          {totalPages}
-                        </PaginationLink>
-                      </PaginationItem>
-                    )}
-                    
-                    <PaginationItem>
-                      <PaginationNext 
-                        onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
-                        className={currentPage >= totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                      />
-                    </PaginationItem>
-                  </PaginationContent>
-                </Pagination>
-              </div>
-            )}
-          </>
+          <div className="text-center py-12">
+            <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-foreground mb-2">
+              Nenhum serviço encontrado
+            </h3>
+            <p className="text-muted-foreground mb-6">
+              {searchParams.get('busca') 
+                ? `Não encontramos serviços para "${searchParams.get('busca')}".`
+                : 'Não há serviços disponíveis no momento.'
+              }
+            </p>
+            <Button variant="outline" onClick={() => {
+              setSearchParams({});
+              setFilters({ area: '', status: '', demandaRotina: '' });
+            }}>
+              Limpar Filtros
+            </Button>
+          </div>
         )}
-      </main>
+      </div>
     </div>
   );
-}
+};
+
+export default Servicos;

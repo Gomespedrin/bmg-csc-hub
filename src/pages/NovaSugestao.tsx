@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Header } from "@/components/layout/Header";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -17,12 +17,12 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { useCreateSugestao } from "@/hooks/useSugestoes";
 import { useToast } from "@/hooks/use-toast";
 
-type SugestaoMode = "criacao" | "edicao";
+type SugestaoMode = "novo" | "edicao";
 type SugestaoScope = "area" | "processo" | "subprocesso" | "servico";
 
-interface SugestaoForm {
-  modo: SugestaoMode;
-  escopo: SugestaoScope;
+interface FormData {
+  modo: "novo" | "edicao";
+  escopo: "area" | "processo" | "subprocesso" | "servico";
   areaId?: string;
   processoId?: string;
   subprocessoId?: string;
@@ -31,6 +31,15 @@ interface SugestaoForm {
   descricao: string;
   justificativa: string;
   dadosAtuais?: any;
+  // Campos avançados para serviços
+  tempo_medio?: number;
+  unidade_medida?: string;
+  sla?: number;
+  sli?: number;
+  demanda_rotina?: string;
+  requisitos_operacionais?: string;
+  observacoes?: string;
+  quem_pode_utilizar?: string;
 }
 
 export default function NovaSugestao() {
@@ -41,8 +50,8 @@ export default function NovaSugestao() {
   const { data: areas } = useAreas();
   const createSugestao = useCreateSugestao();
   
-  const [form, setForm] = useState<SugestaoForm>({
-    modo: "criacao",
+  const [form, setForm] = useState<FormData>({
+    modo: "novo",
     escopo: "area",
     nome: "",
     descricao: "",
@@ -116,6 +125,31 @@ export default function NovaSugestao() {
     }
   }, [form.subprocessoId, subprocessos]);
 
+  // Buscar dados atuais quando é edição
+  useEffect(() => {
+    if (form.modo === "edicao" && form.servicoId && servicos.length > 0) {
+      const servicoAtual = servicos.find(s => s.id === form.servicoId);
+      if (servicoAtual) {
+        console.log("🔍 NovaSugestao - Serviço atual encontrado:", servicoAtual);
+        setForm(prev => ({
+          ...prev,
+          dadosAtuais: {
+            nome: servicoAtual.produto || servicoAtual.nome,
+            descricao: servicoAtual.descricao || servicoAtual.o_que_e,
+            quem_pode_utilizar: servicoAtual.quem_pode_utilizar,
+            tempo_medio: servicoAtual.tempo_medio,
+            unidade_medida: servicoAtual.unidade_medida,
+            sla: servicoAtual.sla,
+            sli: servicoAtual.sli,
+            demanda_rotina: servicoAtual.demanda_rotina,
+            requisitos_operacionais: servicoAtual.requisitos_operacionais,
+            observacoes: servicoAtual.observacoes
+          }
+        }));
+      }
+    }
+  }, [form.modo, form.servicoId, servicos]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -140,7 +174,7 @@ export default function NovaSugestao() {
       const servicoInfo = servicos.find(s => s.id === form.servicoId);
 
       const sugestaoData = {
-        tipo: form.modo === "criacao" ? "novo" : "edicao",
+        tipo: form.modo === "novo" ? "novo" : "edicao",
         modo: form.modo,
         dados_sugeridos: {
           modo: form.modo,
@@ -250,11 +284,11 @@ export default function NovaSugestao() {
   const isFormValid = () => {
     const requiredFields = ["nome", "descricao", "justificativa"];
     const hasRequiredFields = requiredFields.every(field => 
-      form[field as keyof SugestaoForm] && 
-      String(form[field as keyof SugestaoForm]).trim() !== ""
+      form[field as keyof FormData] && 
+      String(form[field as keyof FormData]).trim() !== ""
     );
 
-    if (form.modo === "criacao") {
+    if (form.modo === "novo") {
       // Para criação, verificar hierarquia baseada no escopo
       let hasRequiredHierarchy = true;
       
@@ -315,8 +349,6 @@ export default function NovaSugestao() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
-      
       <main className="container mx-auto px-6 py-8">
         {/* Header */}
         <div className="mb-8">
@@ -731,24 +763,156 @@ export default function NovaSugestao() {
                     />
                   </div>
 
-                  {/* Dados Atuais (apenas para edição) */}
-                  {form.modo === "edicao" && form.dadosAtuais && (
-                    <div className="space-y-2">
-                      <Label className="text-black">Dados Atuais</Label>
-                      <Card className="bg-muted/50">
-                        <CardContent className="p-4">
-                          <div className="space-y-2">
-                            <div>
-                              <span className="font-medium text-black">Nome:</span> {form.dadosAtuais.nome}
-                            </div>
-                            <div>
-                              <span className="font-medium text-black">Descrição:</span> {form.dadosAtuais.descricao}
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
-                  )}
+                   {/* Campos específicos para serviços */}
+                   {form.escopo === "servico" && (
+                     <>
+                       <div className="space-y-2">
+                         <Label className="text-black">Quem pode utilizar</Label>
+                         <Input
+                           value={form.quem_pode_utilizar || ""}
+                           onChange={(e) => setForm(prev => ({ ...prev, quem_pode_utilizar: e.target.value }))}
+                           placeholder="Quem pode utilizar este serviço?"
+                           className="text-black"
+                         />
+                       </div>
+                     </>
+                   )}
+
+                   {/* Dados Atuais (apenas para edição) */}
+                   {form.modo === "edicao" && form.dadosAtuais && (
+                     <div className="space-y-2">
+                       <Label className="text-black">Dados Atuais</Label>
+                       <Card className="bg-muted/50">
+                         <CardContent className="p-4">
+                           <div className="space-y-2">
+                             <div>
+                               <span className="font-medium text-black">Nome:</span> {form.dadosAtuais.nome}
+                             </div>
+                             <div>
+                               <span className="font-medium text-black">Descrição:</span> {form.dadosAtuais.descricao}
+                             </div>
+                             {form.escopo === "servico" && form.dadosAtuais.quem_pode_utilizar && (
+                               <div>
+                                 <span className="font-medium text-black">Quem pode utilizar:</span> {form.dadosAtuais.quem_pode_utilizar}
+                               </div>
+                             )}
+                             {form.escopo === "servico" && form.dadosAtuais.tempo_medio && (
+                               <div>
+                                 <span className="font-medium text-black">Tempo médio:</span> {form.dadosAtuais.tempo_medio} {form.dadosAtuais.unidade_medida}
+                               </div>
+                             )}
+                             {form.escopo === "servico" && form.dadosAtuais.sla && (
+                               <div>
+                                 <span className="font-medium text-black">SLA:</span> {form.dadosAtuais.sla} horas
+                               </div>
+                             )}
+                             {form.escopo === "servico" && form.dadosAtuais.demanda_rotina && (
+                               <div>
+                                 <span className="font-medium text-black">Tipo de demanda:</span> {form.dadosAtuais.demanda_rotina}
+                               </div>
+                             )}
+                           </div>
+                         </CardContent>
+                       </Card>
+                     </div>
+                   )}
+
+                   {/* Campos Avançados para Serviços */}
+                   {form.escopo === "servico" && (
+                     <>
+                       <Separator />
+                       <h4 className="text-lg font-semibold text-black">Informações Avançadas</h4>
+                       
+                       <div className="grid grid-cols-2 gap-4">
+                         <div>
+                           <Label htmlFor="tempo_medio">Tempo Médio</Label>
+                           <Input
+                             id="tempo_medio"
+                             type="number"
+                             value={form.tempo_medio || ''}
+                             onChange={(e) => setForm(prev => ({ ...prev, tempo_medio: e.target.value ? parseInt(e.target.value) : undefined }))}
+                             className="text-black"
+                           />
+                         </div>
+                         <div>
+                           <Label htmlFor="unidade_medida">Unidade de Medida</Label>
+                           <Select
+                             value={form.unidade_medida || ''}
+                             onValueChange={(value) => setForm(prev => ({ ...prev, unidade_medida: value }))}
+                           >
+                             <SelectTrigger>
+                               <SelectValue placeholder="Selecione" />
+                             </SelectTrigger>
+                             <SelectContent>
+                               <SelectItem value="Minutos">Minutos</SelectItem>
+                               <SelectItem value="Horas">Horas</SelectItem>
+                               <SelectItem value="Dias">Dias</SelectItem>
+                             </SelectContent>
+                           </Select>
+                         </div>
+                       </div>
+                       
+                       <div className="grid grid-cols-2 gap-4">
+                         <div>
+                           <Label htmlFor="sla">SLA (horas)</Label>
+                           <Input
+                             id="sla"
+                             type="number"
+                             value={form.sla || ''}
+                             onChange={(e) => setForm(prev => ({ ...prev, sla: e.target.value ? parseInt(e.target.value) : undefined }))}
+                             className="text-black"
+                           />
+                         </div>
+                         <div>
+                           <Label htmlFor="sli">SLI (%)</Label>
+                           <Input
+                             id="sli"
+                             type="number"
+                             step="0.01"
+                             value={form.sli || ''}
+                             onChange={(e) => setForm(prev => ({ ...prev, sli: e.target.value ? parseFloat(e.target.value) : undefined }))}
+                             className="text-black"
+                           />
+                         </div>
+                       </div>
+                       
+                       <div>
+                         <Label htmlFor="demanda_rotina">Tipo de Demanda</Label>
+                         <Select
+                           value={form.demanda_rotina || ''}
+                           onValueChange={(value) => setForm(prev => ({ ...prev, demanda_rotina: value }))}
+                         >
+                           <SelectTrigger>
+                             <SelectValue placeholder="Selecione" />
+                           </SelectTrigger>
+                           <SelectContent>
+                             <SelectItem value="Demanda">Demanda</SelectItem>
+                             <SelectItem value="Rotina">Rotina</SelectItem>
+                           </SelectContent>
+                         </Select>
+                       </div>
+                       
+                       <div>
+                         <Label htmlFor="requisitos_operacionais">Requisitos Operacionais</Label>
+                         <Textarea
+                           id="requisitos_operacionais"
+                           value={form.requisitos_operacionais || ''}
+                           onChange={(e) => setForm(prev => ({ ...prev, requisitos_operacionais: e.target.value }))}
+                           className="text-black"
+                         />
+                       </div>
+                       
+                       <div>
+                         <Label htmlFor="observacoes">Observações</Label>
+                         <Textarea
+                           id="observacoes"
+                           value={form.observacoes || ''}
+                           onChange={(e) => setForm(prev => ({ ...prev, observacoes: e.target.value }))}
+                           className="text-black"
+                         />
+                       </div>
+                     </>
+                   )}
                 </div>
 
                 <Separator />

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Header } from "@/components/layout/Header";
+
 import { AreaCard } from "@/components/areas/AreaCard";
 import { AreaSearchBar } from "@/components/search/AreaSearchBar";
 import { AreaFilterPanel } from "@/components/filters/AreaFilterPanel";
@@ -82,8 +82,6 @@ export default function PorArea() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
-      
       <main className="container mx-auto px-6 py-8">
         {/* Header Section */}
         <div className="text-center mb-8">

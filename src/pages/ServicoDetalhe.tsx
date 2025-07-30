@@ -1,5 +1,5 @@
 import { useParams, Link } from "react-router-dom";
-import { Header } from "@/components/layout/Header";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -24,7 +24,6 @@ export default function ServicoDetalhe() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <Header />
         <main className="container mx-auto px-6 py-8">
           <div className="text-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
@@ -38,7 +37,6 @@ export default function ServicoDetalhe() {
   if (error || !servico) {
     return (
       <div className="min-h-screen bg-background">
-        <Header />
         <main className="container mx-auto px-6 py-8">
           <div className="text-center py-12">
             <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -63,8 +61,6 @@ export default function ServicoDetalhe() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
-      
       <main className="container mx-auto px-6 py-8">
         {/* Breadcrumb */}
         <Breadcrumb className="mb-6">
