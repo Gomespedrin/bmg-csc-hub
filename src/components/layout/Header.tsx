@@ -62,6 +62,14 @@ export function Header() {
             >
               Sugerir Serviço
             </Link>
+            {user && (
+              <Link 
+                to="/minhas-sugestoes" 
+                className="text-sm font-medium text-muted-foreground hover:text-primary transition-smooth"
+              >
+                Minhas Sugestões
+              </Link>
+            )}
           </nav>
         </div>
 
@@ -111,6 +119,12 @@ export function Header() {
                   <Link to="/admin/sugestoes">
                     <Shield className="mr-2 h-4 w-4" />
                     <span>Admin - Sugestões</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/admin/catalogo">
+                    <Shield className="mr-2 h-4 w-4" />
+                    <span>Admin - Catálogo</span>
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
