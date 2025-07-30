@@ -71,7 +71,8 @@ export const useAreas = () => {
                     .select('id, produto, status')
                     .eq('subprocesso_id', subprocesso.id)
                     .eq('ativo', true)
-                    .eq('status', 'ativo');
+                    // Remover filtro de status para contar todos os serviços
+                    // .eq('status', 'ativo');
 
                   return {
                     ...subprocesso,
@@ -147,7 +148,8 @@ export const useAreaById = (id: string) => {
                 .select('id, produto, status, tempo_medio, sla, demanda_rotina, o_que_e, quem_pode_utilizar, requisitos_operacionais, observacoes')
                 .eq('subprocesso_id', subprocesso.id)
                 .eq('ativo', true)
-                .eq('status', 'ativo')
+                // Remover filtro de status para contar todos os serviços
+                // .eq('status', 'ativo')
                 .order('produto');
 
               return {

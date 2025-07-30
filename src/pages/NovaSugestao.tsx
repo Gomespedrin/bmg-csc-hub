@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,6 +35,7 @@ interface SugestaoForm {
 
 export default function NovaSugestao() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const { toast } = useToast();
   const { data: areas } = useAreas();
@@ -56,6 +57,34 @@ export default function NovaSugestao() {
   const [processos, setProcessos] = useState<any[]>([]);
   const [subprocessos, setSubprocessos] = useState<any[]>([]);
   const [servicos, setServicos] = useState<any[]>([]);
+
+  // Carregar dados da URL quando a página for carregada
+  useEffect(() => {
+    const modo = searchParams.get('modo');
+    const escopo = searchParams.get('escopo');
+    const areaId = searchParams.get('area_id');
+    const processoId = searchParams.get('processo_id');
+    const subprocessoId = searchParams.get('subprocesso_id');
+    const servicoId = searchParams.get('servico_id');
+    const nome = searchParams.get('nome');
+    const descricao = searchParams.get('descricao');
+    const justificativa = searchParams.get('justificativa');
+    const reenviar = searchParams.get('reenviar');
+
+    if (reenviar === 'true' && modo && escopo) {
+      setForm({
+        modo: modo as SugestaoMode,
+        escopo: escopo as SugestaoScope,
+        areaId: areaId || undefined,
+        processoId: processoId || undefined,
+        subprocessoId: subprocessoId || undefined,
+        servicoId: servicoId || undefined,
+        nome: nome || "",
+        descricao: descricao || "",
+        justificativa: justificativa || ""
+      });
+    }
+  }, [searchParams]);
 
   // Carregar dados hierárquicos baseado na seleção
   useEffect(() => {
@@ -104,9 +133,15 @@ export default function NovaSugestao() {
     console.log("Form:", form);
 
     try {
+      // Buscar informações da área, processo, subprocesso e serviço selecionados
+      const areaInfo = areas?.find(a => a.id === form.areaId);
+      const processoInfo = processos.find(p => p.id === form.processoId);
+      const subprocessoInfo = subprocessos.find(s => s.id === form.subprocessoId);
+      const servicoInfo = servicos.find(s => s.id === form.servicoId);
+
       const sugestaoData = {
         tipo: form.modo === "criacao" ? "novo" : "edicao",
-        modo: form.modo, // Adicionar o campo modo
+        modo: form.modo,
         dados_sugeridos: {
           modo: form.modo,
           escopo: form.escopo,
@@ -116,9 +151,16 @@ export default function NovaSugestao() {
           servico_id: form.servicoId,
           nome: form.nome,
           descricao: form.descricao,
+          // Adicionar informações para exibição
+          area: areaInfo?.nome || '',
+          processo: processoInfo?.nome || '',
+          subprocesso: subprocessoInfo?.nome || '',
+          servico: servicoInfo?.nome || '',
+          produto: form.nome, // Para compatibilidade com a exibição
+          oQueE: form.descricao, // Para compatibilidade com a exibição
           dados_atuais: form.dadosAtuais
         },
-        dados_atuais: form.dadosAtuais || {}, // Adicionar dados_atuais no nível raiz
+        dados_atuais: form.dadosAtuais || {},
         justificativa: form.justificativa
       };
 
@@ -259,6 +301,16 @@ export default function NovaSugestao() {
       console.log("isFormValid - Edição:", { hasRequiredFields, hasTargetItem, isValid });
       return isValid;
     }
+  };
+
+  // Função para obter mensagem de validação específica
+  const getValidationMessage = () => {
+    if (form.modo === "criacao" && form.escopo === "servico") {
+      if (!form.areaId) return "Selecione uma área";
+      if (!form.processoId) return "Selecione um processo";
+      if (!form.subprocessoId) return "Selecione um subprocesso";
+    }
+    return null;
   };
 
   return (
@@ -722,13 +774,18 @@ export default function NovaSugestao() {
                   >
                     Cancelar
                   </Button>
-                  <Button 
-                    type="submit" 
-                    disabled={!isFormValid() || isSubmitting}
-                    onClick={() => console.log("Botão Enviar Sugestão clicado")}
-                  >
-                    {isSubmitting ? "Enviando..." : "Enviar Sugestão"}
-                  </Button>
+                  <div className="flex flex-col gap-2">
+                    {getValidationMessage() && (
+                      <p className="text-sm text-red-600">{getValidationMessage()}</p>
+                    )}
+                    <Button 
+                      type="submit" 
+                      disabled={!isFormValid() || isSubmitting}
+                      onClick={() => console.log("Botão Enviar Sugestão clicado")}
+                    >
+                      {isSubmitting ? "Enviando..." : "Enviar Sugestão"}
+                    </Button>
+                  </div>
                 </div>
               </form>
             </CardContent>
@@ -747,9 +804,12 @@ export default function NovaSugestao() {
                 Sua sugestão foi enviada com sucesso e está sendo analisada pela equipe.
               </DialogDescription>
             </DialogHeader>
-            <DialogFooter>
+            <DialogFooter className="flex flex-col sm:flex-row gap-2">
               <Button variant="outline" onClick={() => navigate(-1)}>
                 Voltar
+              </Button>
+              <Button onClick={() => navigate('/minhas-sugestoes')}>
+                Ver Minhas Sugestões
               </Button>
               <Button onClick={() => {
                 setShowSuccessModal(false);

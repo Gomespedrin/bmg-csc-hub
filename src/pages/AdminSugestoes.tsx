@@ -16,9 +16,14 @@ export default function AdminSugestoes() {
   const { data: sugestoes, isLoading } = useSugestoes();
   const updateSugestao = useUpdateSugestao();
   const [comentarioAdmin, setComentarioAdmin] = useState("");
+  const [justificativaRejeicao, setJustificativaRejeicao] = useState("");
   const [selectedSugestao, setSelectedSugestao] = useState<string | null>(null);
+  const [processingId, setProcessingId] = useState<string | null>(null);
 
   const handleApprove = async (id: string) => {
+    if (processingId) return; // Evitar múltiplas operações simultâneas
+    
+    setProcessingId(id);
     try {
       await updateSugestao.mutateAsync({
         id,
@@ -33,22 +38,80 @@ export default function AdminSugestoes() {
       
       setComentarioAdmin("");
       setSelectedSugestao(null);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao aprovar:', error);
+      
+      let errorMessage = "Erro ao aprovar sugestão. Verifique se você está logado.";
+      
+      if (error.message) {
+        if (error.message.includes('área') && error.message.includes('obrigatório')) {
+          errorMessage = "Nome da área é obrigatório.";
+        } else if (error.message.includes('processo') && error.message.includes('obrigatório')) {
+          errorMessage = "Nome do processo é obrigatório.";
+        } else if (error.message.includes('subprocesso') && error.message.includes('obrigatório')) {
+          errorMessage = "Nome do subprocesso é obrigatório.";
+        } else if (error.message.includes('serviço') && error.message.includes('obrigatório')) {
+          errorMessage = "Nome do serviço é obrigatório.";
+        } else if (error.message.includes('selecionar uma área')) {
+          errorMessage = "É necessário selecionar uma área para criar um processo/subprocesso/serviço.";
+        } else if (error.message.includes('selecionar um processo')) {
+          errorMessage = "É necessário selecionar um processo para criar um subprocesso/serviço.";
+        } else if (error.message.includes('selecionar um subprocesso')) {
+          errorMessage = "É necessário selecionar um subprocesso para criar um serviço.";
+        } else if (error.message.includes('selecionar um serviço')) {
+          errorMessage = "É necessário selecionar um serviço para edição.";
+        } else if (error.message.includes('criar área')) {
+          errorMessage = `Erro ao criar área: ${error.message.split('criar área: ')[1]}`;
+        } else if (error.message.includes('criar processo')) {
+          errorMessage = `Erro ao criar processo: ${error.message.split('criar processo: ')[1]}`;
+        } else if (error.message.includes('criar subprocesso')) {
+          errorMessage = `Erro ao criar subprocesso: ${error.message.split('criar subprocesso: ')[1]}`;
+        } else if (error.message.includes('criar serviço')) {
+          errorMessage = `Erro ao criar serviço: ${error.message.split('criar serviço: ')[1]}`;
+        } else if (error.message.includes('atualizar área')) {
+          errorMessage = `Erro ao atualizar área: ${error.message.split('atualizar área: ')[1]}`;
+        } else if (error.message.includes('atualizar processo')) {
+          errorMessage = `Erro ao atualizar processo: ${error.message.split('atualizar processo: ')[1]}`;
+        } else if (error.message.includes('atualizar subprocesso')) {
+          errorMessage = `Erro ao atualizar subprocesso: ${error.message.split('atualizar subprocesso: ')[1]}`;
+        } else if (error.message.includes('atualizar serviço')) {
+          errorMessage = `Erro ao atualizar serviço: ${error.message.split('atualizar serviço: ')[1]}`;
+        }
+      }
+      
       toast({
         title: "Erro",
-        description: "Erro ao aprovar sugestão. Verifique se você está logado.",
+        description: errorMessage,
         variant: "destructive"
       });
+    } finally {
+      setProcessingId(null);
+      // Timeout de segurança para evitar travamento
+      setTimeout(() => {
+        setProcessingId(null);
+      }, 10000);
     }
   };
 
   const handleReject = async (id: string) => {
+    if (processingId) return; // Evitar múltiplas operações simultâneas
+    
+    // Verificar se há justificativa
+    if (!justificativaRejeicao.trim()) {
+      toast({
+        title: "Justificativa obrigatória",
+        description: "É obrigatório fornecer uma justificativa para rejeitar uma sugestão.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setProcessingId(id);
     try {
       await updateSugestao.mutateAsync({
         id,
         status: 'rejeitada',
-        comentario_admin: comentarioAdmin
+        comentario_admin: `${justificativaRejeicao}${comentarioAdmin ? `\n\nComentário adicional: ${comentarioAdmin}` : ''}`
       });
       
       toast({
@@ -57,14 +120,17 @@ export default function AdminSugestoes() {
       });
       
       setComentarioAdmin("");
+      setJustificativaRejeicao("");
       setSelectedSugestao(null);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao rejeitar:', error);
       toast({
         title: "Erro",
         description: "Erro ao rejeitar sugestão. Verifique se você está logado.",
         variant: "destructive"
       });
+    } finally {
+      setProcessingId(null);
     }
   };
 
@@ -153,7 +219,7 @@ export default function AdminSugestoes() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label className="text-sm font-medium text-muted-foreground">Área</Label>
-                      <p className="text-sm">{sugestao.dados_sugeridos.area}</p>
+                      <p className="text-sm">{sugestao.dados_sugeridos.area || 'Não informado'}</p>
                     </div>
                     <div>
                       <Label className="text-sm font-medium text-muted-foreground">Processo</Label>
@@ -161,9 +227,23 @@ export default function AdminSugestoes() {
                     </div>
                   </div>
 
+                  {sugestao.dados_sugeridos.subprocesso && (
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Subprocesso</Label>
+                      <p className="text-sm">{sugestao.dados_sugeridos.subprocesso}</p>
+                    </div>
+                  )}
+
+                  {sugestao.dados_sugeridos.servico && (
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Serviço</Label>
+                      <p className="text-sm">{sugestao.dados_sugeridos.servico}</p>
+                    </div>
+                  )}
+
                   <div>
                     <Label className="text-sm font-medium text-muted-foreground">Descrição</Label>
-                    <p className="text-sm mt-1">{sugestao.dados_sugeridos.oQueE}</p>
+                    <p className="text-sm mt-1">{sugestao.dados_sugeridos.oQueE || sugestao.dados_sugeridos.descricao || 'Não informado'}</p>
                   </div>
 
                   {sugestao.justificativa && (
@@ -185,10 +265,28 @@ export default function AdminSugestoes() {
                       <Separator />
                       <div className="space-y-3">
                         <div>
-                          <Label htmlFor={`comentario-${sugestao.id}`}>Comentário (opcional)</Label>
+                          <Label htmlFor={`justificativa-${sugestao.id}`}>
+                            Justificativa para Rejeição *
+                          </Label>
+                          <Textarea
+                            id={`justificativa-${sugestao.id}`}
+                            placeholder="Explique o motivo da rejeição (obrigatório)..."
+                            value={selectedSugestao === sugestao.id ? justificativaRejeicao : ''}
+                            onChange={(e) => {
+                              setSelectedSugestao(sugestao.id);
+                              setJustificativaRejeicao(e.target.value);
+                            }}
+                            className="mt-1"
+                          />
+                        </div>
+                        
+                        <div>
+                          <Label htmlFor={`comentario-${sugestao.id}`}>
+                            Comentário Adicional (opcional)
+                          </Label>
                           <Textarea
                             id={`comentario-${sugestao.id}`}
-                            placeholder="Adicione um comentário sobre sua decisão..."
+                            placeholder="Adicione um comentário adicional se necessário..."
                             value={selectedSugestao === sugestao.id ? comentarioAdmin : ''}
                             onChange={(e) => {
                               setSelectedSugestao(sugestao.id);
@@ -201,9 +299,18 @@ export default function AdminSugestoes() {
                         <div className="flex space-x-2">
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button size="sm" className="flex-1">
-                                <Check className="mr-2 h-4 w-4" />
-                                Aprovar
+                              <Button size="sm" className="flex-1" disabled={processingId === sugestao.id} aria-label="Aprovar sugestão">
+                                {processingId === sugestao.id ? (
+                                  <>
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                    Processando...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Check className="mr-2 h-4 w-4" />
+                                    Aprovar
+                                  </>
+                                )}
                               </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
@@ -224,9 +331,18 @@ export default function AdminSugestoes() {
 
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button variant="destructive" size="sm" className="flex-1">
-                                <X className="mr-2 h-4 w-4" />
-                                Rejeitar
+                              <Button variant="destructive" size="sm" className="flex-1" disabled={processingId === sugestao.id} aria-label="Rejeitar sugestão">
+                                {processingId === sugestao.id ? (
+                                  <>
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                    Processando...
+                                  </>
+                                ) : (
+                                  <>
+                                    <X className="mr-2 h-4 w-4" />
+                                    Rejeitar
+                                  </>
+                                )}
                               </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
