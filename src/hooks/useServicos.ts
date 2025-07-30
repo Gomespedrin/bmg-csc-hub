@@ -1,5 +1,6 @@
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useMemo } from 'react';
 
 export interface Servico {
   id: string;
@@ -30,187 +31,225 @@ export interface Servico {
   };
 }
 
-export const useServicos = (filters?: any) => {
+interface FilterOptions {
+  areas?: string[];
+  processos?: string[];
+  subprocessos?: string[];
+  produto?: string;
+  demandaRotina?: string;
+  status?: string[];
+  busca?: string;
+  page?: number;
+  pageSize?: number;
+  showAll?: boolean; // Nova opção para mostrar todos os serviços
+}
+
+export function useServicos(filters: FilterOptions = {}) {
+  const {
+    areas = [],
+    processos = [],
+    subprocessos = [],
+    produto = "",
+    demandaRotina = "todos",
+    status = [],
+    busca = "",
+    page = 1,
+    pageSize = 20,
+    showAll = true
+  } = filters;
+
+  // Criar uma chave estável para o React Query
+  const stableFilters = useMemo(() => ({
+    areas: areas.sort(),
+    processos: processos.sort(),
+    subprocessos: subprocessos.sort(),
+    produto,
+    demandaRotina,
+    status: status.sort(),
+    busca,
+    page,
+    pageSize,
+    showAll
+  }), [areas, processos, subprocessos, produto, demandaRotina, status, busca, page, pageSize, showAll]);
+
   return useQuery({
-    queryKey: ['servicos', filters],
+    queryKey: ["servicos", stableFilters],
     queryFn: async () => {
-      // Buscar todos os serviços ativos
-      const { data: servicos, error } = await supabase
-        .from('servicos')
-        .select('*')
-        .eq('ativo', true);
+      console.log("🔍 Fetching services with filters:", stableFilters);
       
-      if (error) throw error;
+      let query = supabase
+        .from("servicos")
+        .select(`
+          id,
+          produto,
+          tempo_medio,
+          sla,
+          status,
+          demanda_rotina,
+          o_que_e,
+          observacoes,
+          subprocesso:subprocessos!inner(
+            id,
+            nome,
+            processo:processos!inner(
+              id,
+              nome,
+              area:areas!inner(
+                id,
+                nome
+              )
+            )
+          )
+        `)
+        .eq('ativo', true); // Filtrar apenas serviços ativos
 
-      // Buscar informações de subprocesso, processo e área para cada serviço
-      const servicosCompletos = await Promise.all(
-        (servicos || []).map(async (servico) => {
-          // Buscar subprocesso
-          const { data: subprocesso } = await supabase
-            .from('subprocessos')
-            .select('id, nome, processo_id')
-            .eq('id', servico.subprocesso_id)
-            .eq('ativo', true)
-            .single();
-
-          if (!subprocesso) return null;
-
-          // Buscar processo
-          const { data: processo } = await supabase
-            .from('processos')
-            .select('id, nome, area_id')
-            .eq('id', subprocesso.processo_id)
-            .eq('ativo', true)
-            .single();
-
-          if (!processo) return null;
-
-          // Buscar área
-          const { data: area } = await supabase
-            .from('areas')
-            .select('id, nome, icone')
-            .eq('id', processo.area_id)
-            .eq('ativo', true)
-            .single();
-
-          if (!area) return null;
-
-          return {
-            ...servico,
-            subprocesso: {
-              ...subprocesso,
-              processo: {
-                ...processo,
-                area
-              }
-            }
-          };
-        })
-      );
-
-      let filteredServicos = servicosCompletos.filter(Boolean) as Servico[];
-
-      // Debug logging
-      console.log('🔍 Filtering services with filters:', filters);
-      console.log('📊 Total services before filtering:', filteredServicos.length);
-
-      // Aplicar filtros
-      if (filters?.areas?.length > 0) {
-        console.log('🏢 Filtering by areas:', filters.areas);
-        const beforeCount = filteredServicos.length;
-        filteredServicos = filteredServicos.filter(servico => 
-          filters.areas.includes(servico.subprocesso.processo.area.nome)
-        );
-        console.log(`📈 Areas filter: ${beforeCount} -> ${filteredServicos.length} services`);
+      // Aplicar filtros no backend de forma otimizada
+      if (areas.length > 0) {
+        query = query.in("subprocesso.processo.area.nome", areas);
       }
 
-      if (filters?.processos?.length > 0) {
-        console.log('⚙️ Filtering by processos:', filters.processos);
-        const beforeCount = filteredServicos.length;
-        filteredServicos = filteredServicos.filter(servico => 
-          filters.processos.includes(servico.subprocesso.processo.nome)
-        );
-        console.log(`📈 Processos filter: ${beforeCount} -> ${filteredServicos.length} services`);
+      if (processos.length > 0) {
+        query = query.in("subprocesso.processo.nome", processos);
       }
 
-      if (filters?.subprocessos?.length > 0) {
-        console.log('🔧 Filtering by subprocessos:', filters.subprocessos);
-        const beforeCount = filteredServicos.length;
-        filteredServicos = filteredServicos.filter(servico => 
-          filters.subprocessos.includes(servico.subprocesso.nome)
-        );
-        console.log(`📈 Subprocessos filter: ${beforeCount} -> ${filteredServicos.length} services`);
+      if (subprocessos.length > 0) {
+        query = query.in("subprocesso.nome", subprocessos);
       }
 
-      if (filters?.produto) {
-        console.log('📋 Filtering by produto:', filters.produto);
-        const beforeCount = filteredServicos.length;
-        filteredServicos = filteredServicos.filter(servico => 
-          servico.produto.toLowerCase().includes(filters.produto.toLowerCase())
-        );
-        console.log(`📈 Produto filter: ${beforeCount} -> ${filteredServicos.length} services`);
+      if (produto) {
+        query = query.ilike("produto", `%${produto}%`);
       }
 
-      if (filters?.demandaRotina && filters.demandaRotina !== "todos") {
-        console.log('🔄 Filtering by demandaRotina:', filters.demandaRotina);
-        const beforeCount = filteredServicos.length;
-        filteredServicos = filteredServicos.filter(servico => 
-          servico.demanda_rotina === filters.demandaRotina
-        );
-        console.log(`📈 DemandaRotina filter: ${beforeCount} -> ${filteredServicos.length} services`);
+      if (demandaRotina !== "todos") {
+        query = query.eq("demanda_rotina", demandaRotina);
       }
 
-      if (filters?.status?.length > 0) {
-        console.log('📊 Filtering by status:', filters.status);
-        const beforeCount = filteredServicos.length;
-        filteredServicos = filteredServicos.filter(servico => 
-          filters.status.includes(servico.status)
-        );
-        console.log(`📈 Status filter: ${beforeCount} -> ${filteredServicos.length} services`);
+      if (status.length > 0) {
+        query = query.in("status", status);
       }
 
-      console.log('✅ Final filtered services count:', filteredServicos.length);
-      return filteredServicos;
-    },
-  });
-};
+      if (busca) {
+        // Busca mais robusta sem caracteres especiais problemáticos
+        const searchTerms = busca.trim().split(' ').filter(term => term.length > 0);
+        
+        if (searchTerms.length > 0) {
+          const searchConditions = searchTerms.map(term => {
+            const sanitizedTerm = term.replace(/[\[\](){}^$+*?.|\\]/g, '\\$&');
+            return `
+              produto.ilike.%${sanitizedTerm}%,
+              subprocesso.nome.ilike.%${sanitizedTerm}%,
+              subprocesso.processo.nome.ilike.%${sanitizedTerm}%,
+              subprocesso.processo.area.nome.ilike.%${sanitizedTerm}%,
+              o_que_e.ilike.%${sanitizedTerm}%,
+              observacoes.ilike.%${sanitizedTerm}%
+            `;
+          }).join(',');
+          
+          query = query.or(searchConditions);
+        }
+      }
 
-export const useServicoById = (id: string) => {
-  return useQuery({
-    queryKey: ['servico', id],
-    queryFn: async () => {
-      const { data: servico, error } = await supabase
-        .from('servicos')
-        .select('*')
-        .eq('id', id)
-        .single();
-      
-      if (error) throw error;
+      // Aplicar ordenação no backend
+      query = query.order('produto', { ascending: true });
 
-      // Buscar subprocesso
-      const { data: subprocesso } = await supabase
-        .from('subprocessos')
-        .select('id, nome, processo_id')
-        .eq('id', servico.subprocesso_id)
-        .eq('ativo', true)
-        .single();
+      // Aplicar paginação apenas se não estiver mostrando todos
+      if (!showAll) {
+        const startIndex = (page - 1) * pageSize;
+        query = query.range(startIndex, startIndex + pageSize - 1);
+      }
 
-      if (!subprocesso) throw new Error('Subprocesso não encontrado');
+      const { data, error, count } = await query;
 
-      // Buscar processo
-      const { data: processo } = await supabase
-        .from('processos')
-        .select('id, nome, area_id')
-        .eq('id', subprocesso.processo_id)
-        .eq('ativo', true)
-        .single();
+      if (error) {
+        console.error("❌ Error fetching services:", error);
+        throw error;
+      }
 
-      if (!processo) throw new Error('Processo não encontrado');
+      console.log("📊 Total services fetched:", data?.length || 0);
 
-      // Buscar área
-      const { data: area } = await supabase
-        .from('areas')
-        .select('id, nome, icone')
-        .eq('id', processo.area_id)
-        .eq('ativo', true)
-        .single();
+      // Ordenação alfabética por hierarquia em memória (se necessário)
+      const sortedData = (data || []).sort((a: any, b: any) => {
+        // 1. Ordenar por Área
+        const areaA = a.subprocesso?.processo?.area?.nome || "";
+        const areaB = b.subprocesso?.processo?.area?.nome || "";
+        if (areaA !== areaB) {
+          return areaA.localeCompare(areaB, 'pt-BR');
+        }
 
-      if (!area) throw new Error('Área não encontrada');
+        // 2. Ordenar por Processo
+        const processoA = a.subprocesso?.processo?.nome || "";
+        const processoB = b.subprocesso?.processo?.nome || "";
+        if (processoA !== processoB) {
+          return processoA.localeCompare(processoB, 'pt-BR');
+        }
+
+        // 3. Ordenar por Subprocesso
+        const subprocessoA = a.subprocesso?.nome || "";
+        const subprocessoB = b.subprocesso?.nome || "";
+        if (subprocessoA !== subprocessoB) {
+          return subprocessoA.localeCompare(subprocessoB, 'pt-BR');
+        }
+
+        // 4. Ordenar por Produto
+        const produtoA = a.produto || "";
+        const produtoB = b.produto || "";
+        return produtoA.localeCompare(produtoB, 'pt-BR');
+      });
+
+      const totalItems = showAll ? sortedData.length : (count || sortedData.length);
+      const totalPages = showAll ? 1 : Math.ceil(totalItems / pageSize);
+
+      console.log(`📄 Pagination: ${totalItems} total -> ${sortedData.length} items on page`);
 
       return {
-        ...servico,
-        subprocesso: {
-          ...subprocesso,
-          processo: {
-            ...processo,
-            area
-          }
-        }
-      } as Servico;
+        services: sortedData,
+        totalItems,
+        totalPages,
+        currentPage: page,
+        pageSize
+      };
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutos
+    gcTime: 10 * 60 * 1000, // 10 minutos
+  });
+}
+
+export function useServicoById(id: string) {
+  return useQuery({
+    queryKey: ["servico", id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("servicos")
+        .select(`
+          *,
+          subprocesso:subprocessos!inner(
+            id,
+            nome,
+            processo:processos!inner(
+              id,
+              nome,
+              area:areas!inner(
+                id,
+                nome
+              )
+            )
+          )
+        `)
+        .eq("id", id)
+        .single();
+
+      if (error) {
+        console.error("❌ Error fetching service:", error);
+        throw error;
+      }
+
+      return data;
     },
     enabled: !!id,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   });
-};
+}
 
 const getAreaIds = async (areaNames: string[]) => {
   const { data } = await supabase

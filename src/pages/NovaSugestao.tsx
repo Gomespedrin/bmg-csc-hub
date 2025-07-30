@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,87 +7,203 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { ArrowLeft, Send, FileText, Lightbulb } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
-import { useToast } from "@/hooks/use-toast";
-import { useCreateSugestao } from "@/hooks/useSugestoes";
-import { useAreas } from "@/hooks/useAreas";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ArrowLeft, Plus, Edit, FileText, CheckCircle, AlertCircle } from "lucide-react";
+import { useAreas, useAreaById } from "@/hooks/useAreas";
+import { supabase } from "@/integrations/supabase/client";
+
+type SugestaoMode = "criacao" | "edicao";
+type SugestaoScope = "area" | "processo" | "subprocesso" | "servico";
+
+interface SugestaoForm {
+  modo: SugestaoMode;
+  escopo: SugestaoScope;
+  areaId?: string;
+  processoId?: string;
+  subprocessoId?: string;
+  servicoId?: string;
+  nome: string;
+  descricao: string;
+  justificativa: string;
+  dadosAtuais?: any;
+}
 
 export default function NovaSugestao() {
-  const { toast } = useToast();
   const navigate = useNavigate();
-  const createSugestao = useCreateSugestao();
-  const { data: areas, isLoading: areasLoading } = useAreas();
+  const { data: areas } = useAreas();
   
-  const [tipoSugestao, setTipoSugestao] = useState("");
-  const [formData, setFormData] = useState({
-    produto: "",
-    area: "",
-    processo: "",
-    subprocesso: "",
-    demandaRotina: "Demanda",
-    oQueE: "",
-    quemPodeUtilizar: "",
-    tempoMedio: "",
-    unidadeMedida: "",
-    sla: "",
-    sli: "",
-    requisitosOperacionais: "",
-    observacoes: "",
+  const [form, setForm] = useState<SugestaoForm>({
+    modo: "criacao",
+    escopo: "area",
+    nome: "",
+    descricao: "",
     justificativa: ""
   });
+  
+  const { data: areaCompleta } = useAreaById(form.areaId || "");
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Estados para dados hierárquicos
+  const [processos, setProcessos] = useState<any[]>([]);
+  const [subprocessos, setSubprocessos] = useState<any[]>([]);
+  const [servicos, setServicos] = useState<any[]>([]);
+
+  // Carregar dados hierárquicos baseado na seleção
+  useEffect(() => {
+    if (form.areaId && areaCompleta) {
+      setProcessos(areaCompleta.processos || []);
+    } else if (form.areaId && areas) {
+      const area = areas.find(a => a.id === form.areaId);
+      setProcessos(area?.processos || []);
+    } else {
+      setProcessos([]);
+    }
+  }, [form.areaId, areaCompleta, areas]);
+
+  useEffect(() => {
+    if (form.processoId && processos.length > 0) {
+      const processo = processos.find(p => p.id === form.processoId);
+      setSubprocessos(processo?.subprocessos || []);
+    } else {
+      setSubprocessos([]);
+    }
+  }, [form.processoId, processos]);
+
+  useEffect(() => {
+    if (form.subprocessoId && subprocessos.length > 0) {
+      const subprocesso = subprocessos.find(s => s.id === form.subprocessoId);
+      setServicos(subprocesso?.servicos || []);
+    } else {
+      setServicos([]);
+    }
+  }, [form.subprocessoId, subprocessos]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Basic validation
-    if (!tipoSugestao || !formData.produto || !formData.area || !formData.oQueE) {
-      toast({
-        title: "Campos obrigatórios",
-        description: "Por favor, preencha todos os campos obrigatórios.",
-        variant: "destructive"
-      });
-      return;
-    }
+    setIsSubmitting(true);
 
     try {
-      // Convert numeric fields
-      const dadosSugeridos = {
-        ...formData,
-        tempo_medio: formData.tempoMedio ? parseInt(formData.tempoMedio) : null,
-        sla: formData.sla ? parseInt(formData.sla) : null,
-        sli: formData.sli ? parseFloat(formData.sli) : null,
+      const sugestaoData = {
+        tipo: `${form.modo}_${form.escopo}`,
+        criado_por: "usuario_atual", // TODO: Implementar autenticação
+        dados_sugeridos: {
+          modo: form.modo,
+          escopo: form.escopo,
+          area_id: form.areaId,
+          processo_id: form.processoId,
+          subprocesso_id: form.subprocessoId,
+          servico_id: form.servicoId,
+          nome: form.nome,
+          descricao: form.descricao,
+          dados_atuais: form.dadosAtuais
+        },
+        justificativa: form.justificativa,
+        status: "pendente",
+        created_at: new Date().toISOString()
       };
 
-      await createSugestao.mutateAsync({
-        tipo: tipoSugestao,
-        dados_sugeridos: dadosSugeridos,
-        justificativa: formData.justificativa
-      });
+      const { error } = await supabase
+        .from("sugestoes")
+        .insert([sugestaoData]);
 
-      toast({
-        title: "Sugestão enviada!",
-        description: "Sua sugestão foi enviada para análise e você receberá um retorno em breve.",
-      });
+      if (error) {
+        console.error("Erro ao salvar sugestão:", error);
+        throw error;
+      }
 
-      // Navigate back to home
-      navigate('/');
-      
+      setShowSuccessModal(true);
     } catch (error) {
-      toast({
-        title: "Erro ao enviar sugestão",
-        description: "Ocorreu um erro ao enviar sua sugestão. Tente novamente.",
-        variant: "destructive"
-      });
+      console.error("Erro ao enviar sugestão:", error);
+      alert("Erro ao enviar sugestão. Tente novamente.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleEscopoChange = (escopo: SugestaoScope) => {
+    setForm(prev => ({
+      ...prev,
+      escopo,
+      processoId: undefined,
+      subprocessoId: undefined,
+      servicoId: undefined,
+      nome: "",
+      descricao: "",
+      dadosAtuais: undefined
+    }));
+  };
+
+  const handleItemSelect = async (itemId: string, itemType: string) => {
+    if (form.modo === "edicao") {
+      // Carregar dados atuais do item selecionado
+      try {
+        let dadosAtuais;
+        
+        switch (itemType) {
+          case "area":
+            dadosAtuais = areas?.find(a => a.id === itemId);
+            break;
+          case "processo":
+            dadosAtuais = processos.find(p => p.id === itemId);
+            break;
+          case "subprocesso":
+            dadosAtuais = subprocessos.find(s => s.id === itemId);
+            break;
+          case "servico":
+            dadosAtuais = servicos.find(s => s.id === itemId);
+            break;
+        }
+
+        setForm(prev => ({
+          ...prev,
+          [`${itemType}Id`]: itemId,
+          nome: dadosAtuais?.nome || "",
+          descricao: dadosAtuais?.descricao || "",
+          dadosAtuais
+        }));
+      } catch (error) {
+        console.error("Erro ao carregar dados atuais:", error);
+      }
+    } else {
+      setForm(prev => ({
+        ...prev,
+        [`${itemType}Id`]: itemId
+      }));
+    }
+  };
+
+  const getEscopoLabel = (escopo: SugestaoScope) => {
+    switch (escopo) {
+      case "area": return "Área";
+      case "processo": return "Processo";
+      case "subprocesso": return "Subprocesso";
+      case "servico": return "Serviço";
+      default: return escopo;
+    }
+  };
+
+  const isFormValid = () => {
+    const requiredFields = ["nome", "descricao", "justificativa"];
+    const hasRequiredFields = requiredFields.every(field => 
+      form[field as keyof SugestaoForm] && 
+      String(form[field as keyof SugestaoForm]).trim() !== ""
+    );
+
+    if (form.modo === "criacao") {
+      // Para criação, os níveis superiores são obrigatórios
+      const hasRequiredHierarchy = form.areaId && 
+        (form.escopo === "area" || form.processoId) &&
+        (form.escopo === "processo" || form.subprocessoId) &&
+        (form.escopo === "subprocesso" || form.servicoId);
+      
+      return hasRequiredFields && hasRequiredHierarchy;
+    } else {
+      // Para edição, apenas o item-alvo é obrigatório
+      const hasTargetItem = form.areaId || form.processoId || form.subprocessoId || form.servicoId;
+      return hasRequiredFields && hasTargetItem;
     }
   };
 
@@ -95,277 +212,298 @@ export default function NovaSugestao() {
       <Header />
       
       <main className="container mx-auto px-6 py-8">
-        {/* Breadcrumb */}
-        <Breadcrumb className="mb-6">
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link to="/">Início</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>Nova Sugestão</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-
-        {/* Back Button */}
-        <Button variant="ghost" asChild className="mb-6">
-          <Link to="/">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Voltar ao Início
-          </Link>
-        </Button>
-
-        <div className="max-w-4xl mx-auto">
-          {/* Header */}
-          <div className="text-center mb-8">
-            <div className="flex items-center justify-center space-x-2 mb-4">
-              <Lightbulb className="h-8 w-8 text-primary" />
-              <h1 className="text-3xl font-bold text-foreground">
-                Nova Sugestão
-              </h1>
+        {/* Header */}
+        <div className="mb-8">
+          <Button variant="ghost" asChild className="mb-6">
+            <div onClick={() => navigate(-1)}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Voltar
             </div>
+          </Button>
+          
+          <div className="text-center">
+            <h1 className="text-3xl font-bold text-foreground mb-4">
+              {form.modo === "criacao" ? "Nova Sugestão" : "Editar Item"}
+            </h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Contribua para a melhoria contínua dos nossos serviços. 
-              Sugira novos serviços ou melhorias nos existentes.
+              {form.modo === "criacao" 
+                ? "Sugira a criação de novos itens no catálogo de serviços."
+                : "Sugira melhorias para itens existentes no catálogo."
+              }
             </p>
           </div>
+        </div>
 
-          <form onSubmit={handleSubmit} className="space-y-8">
-            {/* Tipo de Sugestão */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Tipo de Sugestão</CardTitle>
-                <CardDescription>
-                  Selecione o tipo da sua sugestão
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <RadioGroup value={tipoSugestao} onValueChange={setTipoSugestao}>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="novo" id="novo" />
-                    <Label htmlFor="novo">Novo Serviço</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="melhoria" id="melhoria" />
-                    <Label htmlFor="melhoria">Melhoria em Serviço Existente</Label>
-                  </div>
-                </RadioGroup>
-              </CardContent>
-            </Card>
-
-            {/* Informações Básicas */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Informações Básicas</CardTitle>
-                <CardDescription>
-                  Dados fundamentais do serviço
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="max-w-4xl mx-auto">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                {form.modo === "criacao" ? <Plus className="h-5 w-5" /> : <Edit className="h-5 w-5" />}
+                <span>Formulário de Sugestão</span>
+              </CardTitle>
+              <CardDescription>
+                Preencha os campos abaixo para enviar sua sugestão
+              </CardDescription>
+            </CardHeader>
+            
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Modo e Escopo */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label htmlFor="produto">Produto *</Label>
-                    <Input
-                      id="produto"
-                      placeholder="Nome do produto/serviço"
-                      value={formData.produto}
-                      onChange={(e) => setFormData({...formData, produto: e.target.value})}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="area">Área *</Label>
-                    <Select value={formData.area} onValueChange={(value) => setFormData({...formData, area: value})}>
+                    <Label>Modo</Label>
+                    <Select 
+                      value={form.modo} 
+                      onValueChange={(value: SugestaoMode) => setForm(prev => ({ ...prev, modo: value }))}
+                    >
                       <SelectTrigger>
-                        <SelectValue placeholder={areasLoading ? "Carregando..." : "Selecione a área"} />
+                        <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {areasLoading ? (
-                          <SelectItem value="loading" disabled>Carregando áreas...</SelectItem>
-                        ) : areas?.length ? (
-                          areas.map(area => (
-                            <SelectItem key={area.id} value={area.nome}>{area.nome}</SelectItem>
-                          ))
-                        ) : (
-                          <SelectItem value="no-areas" disabled>Nenhuma área encontrada</SelectItem>
-                        )}
+                        <SelectItem value="criacao">
+                          <div className="flex items-center space-x-2">
+                            <Plus className="h-4 w-4" />
+                            <span>Criação</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="edicao">
+                          <div className="flex items-center space-x-2">
+                            <Edit className="h-4 w-4" />
+                            <span>Edição</span>
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Escopo</Label>
+                    <Select 
+                      value={form.escopo} 
+                      onValueChange={handleEscopoChange}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="area">Área</SelectItem>
+                        <SelectItem value="processo">Processo</SelectItem>
+                        <SelectItem value="subprocesso">Subprocesso</SelectItem>
+                        <SelectItem value="servico">Serviço</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Separator />
+
+                {/* Hierarquia */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Hierarquia</h3>
+                  
+                  {/* Área */}
                   <div className="space-y-2">
-                    <Label htmlFor="processo">Processo</Label>
+                    <Label>Área {form.modo === "criacao" && form.escopo !== "area" && "*"}</Label>
+                    <Select 
+                      value={form.areaId || ""} 
+                      onValueChange={(value) => handleItemSelect(value, "area")}
+                      disabled={false}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione uma área" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {areas?.map(area => (
+                          <SelectItem key={area.id} value={area.id}>
+                            {area.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Processo */}
+                  {form.escopo !== "area" && (
+                    <div className="space-y-2">
+                      <Label>Processo {form.modo === "criacao" && form.escopo !== "processo" && "*"}</Label>
+                      <Select 
+                        value={form.processoId || ""} 
+                        onValueChange={(value) => handleItemSelect(value, "processo")}
+                        disabled={!form.areaId}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione um processo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {processos.map(processo => (
+                            <SelectItem key={processo.id} value={processo.id}>
+                              {processo.nome}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {/* Subprocesso */}
+                  {form.escopo !== "area" && form.escopo !== "processo" && (
+                    <div className="space-y-2">
+                      <Label>Subprocesso {form.modo === "criacao" && form.escopo !== "subprocesso" && "*"}</Label>
+                      <Select 
+                        value={form.subprocessoId || ""} 
+                        onValueChange={(value) => handleItemSelect(value, "subprocesso")}
+                        disabled={!form.processoId}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione um subprocesso" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {subprocessos.map(subprocesso => (
+                            <SelectItem key={subprocesso.id} value={subprocesso.id}>
+                              {subprocesso.nome}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {/* Serviço */}
+                  {form.escopo === "servico" && (
+                    <div className="space-y-2">
+                      <Label>Serviço {form.modo === "criacao" && "*"}</Label>
+                      <Select 
+                        value={form.servicoId || ""} 
+                        onValueChange={(value) => handleItemSelect(value, "servico")}
+                        disabled={!form.subprocessoId}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione um serviço" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {servicos.map(servico => (
+                            <SelectItem key={servico.id} value={servico.id}>
+                              {servico.produto}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+
+                <Separator />
+
+                {/* Dados do Item */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Dados do {getEscopoLabel(form.escopo)}</h3>
+                  
+                  <div className="space-y-2">
+                    <Label>Nome *</Label>
                     <Input
-                      id="processo"
-                      placeholder="Nome do processo"
-                      value={formData.processo}
-                      onChange={(e) => setFormData({...formData, processo: e.target.value})}
+                      value={form.nome}
+                      onChange={(e) => setForm(prev => ({ ...prev, nome: e.target.value }))}
+                      placeholder={`Nome do ${getEscopoLabel(form.escopo).toLowerCase()}`}
                     />
                   </div>
+
                   <div className="space-y-2">
-                    <Label htmlFor="subprocesso">Subprocesso</Label>
-                    <Input
-                      id="subprocesso"
-                      placeholder="Nome do subprocesso"
-                      value={formData.subprocesso}
-                      onChange={(e) => setFormData({...formData, subprocesso: e.target.value})}
+                    <Label>Descrição *</Label>
+                    <Textarea
+                      value={form.descricao}
+                      onChange={(e) => setForm(prev => ({ ...prev, descricao: e.target.value }))}
+                      placeholder={`Descrição do ${getEscopoLabel(form.escopo).toLowerCase()}`}
+                      rows={3}
                     />
                   </div>
+
+                  {/* Dados Atuais (apenas para edição) */}
+                  {form.modo === "edicao" && form.dadosAtuais && (
+                    <div className="space-y-2">
+                      <Label>Dados Atuais</Label>
+                      <Card className="bg-muted/50">
+                        <CardContent className="p-4">
+                          <div className="space-y-2">
+                            <div>
+                              <span className="font-medium">Nome:</span> {form.dadosAtuais.nome}
+                            </div>
+                            {form.dadosAtuais.descricao && (
+                              <div>
+                                <span className="font-medium">Descrição:</span> {form.dadosAtuais.descricao}
+                              </div>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  )}
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="demandaRotina">Tipo de Execução</Label>
-                  <Select value={formData.demandaRotina} onValueChange={(value) => setFormData({...formData, demandaRotina: value})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Demanda ou Rotina" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Demanda">Demanda</SelectItem>
-                      <SelectItem value="Rotina">Rotina</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardContent>
-            </Card>
+                <Separator />
 
-            {/* Descrição do Serviço */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Descrição do Serviço</CardTitle>
-                <CardDescription>
-                  Detalhe como o serviço funciona
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
+                {/* Justificativa */}
                 <div className="space-y-2">
-                  <Label htmlFor="oQueE">O que é *</Label>
+                  <Label>Justificativa *</Label>
                   <Textarea
-                    id="oQueE"
-                    placeholder="Descreva o que é o serviço e qual seu objetivo..."
-                    value={formData.oQueE}
-                    onChange={(e) => setFormData({...formData, oQueE: e.target.value})}
-                    className="min-h-[100px]"
+                    value={form.justificativa}
+                    onChange={(e) => setForm(prev => ({ ...prev, justificativa: e.target.value }))}
+                    placeholder="Explique o motivo da sua sugestão..."
+                    rows={4}
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="quemPodeUtilizar">Quem pode utilizar</Label>
-                  <Textarea
-                    id="quemPodeUtilizar"
-                    placeholder="Defina quem pode solicitar ou utilizar este serviço..."
-                    value={formData.quemPodeUtilizar}
-                    onChange={(e) => setFormData({...formData, quemPodeUtilizar: e.target.value})}
-                  />
+                {/* Submit */}
+                <div className="flex justify-end space-x-4">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => navigate(-1)}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    disabled={!isFormValid() || isSubmitting}
+                  >
+                    {isSubmitting ? "Enviando..." : "Enviar Sugestão"}
+                  </Button>
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="requisitosOperacionais">Requisitos Operacionais</Label>
-                  <Textarea
-                    id="requisitosOperacionais"
-                    placeholder="Liste os requisitos necessários para executar o serviço..."
-                    value={formData.requisitosOperacionais}
-                    onChange={(e) => setFormData({...formData, requisitosOperacionais: e.target.value})}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Acordos de Nível de Serviço */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Acordos de Nível de Serviço</CardTitle>
-                <CardDescription>
-                  Defina os compromissos de qualidade e tempo
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="tempoMedio">Tempo Médio</Label>
-                    <Input
-                      id="tempoMedio"
-                      placeholder="Ex: 2 dias"
-                      value={formData.tempoMedio}
-                      onChange={(e) => setFormData({...formData, tempoMedio: e.target.value})}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="sla">SLA</Label>
-                    <Input
-                      id="sla"
-                      placeholder="Ex: 5 dias"
-                      value={formData.sla}
-                      onChange={(e) => setFormData({...formData, sla: e.target.value})}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="sli">SLI</Label>
-                    <Input
-                      id="sli"
-                      placeholder="Ex: 95%"
-                      value={formData.sli}
-                      onChange={(e) => setFormData({...formData, sli: e.target.value})}
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="unidadeMedida">Unidade de Medida</Label>
-                  <Input
-                    id="unidadeMedida"
-                    placeholder="Ex: dias úteis, horas, etc."
-                    value={formData.unidadeMedida}
-                    onChange={(e) => setFormData({...formData, unidadeMedida: e.target.value})}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Observações e Justificativa */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Informações Adicionais</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="observacoes">Observações</Label>
-                  <Textarea
-                    id="observacoes"
-                    placeholder="Adicione observações importantes sobre o serviço..."
-                    value={formData.observacoes}
-                    onChange={(e) => setFormData({...formData, observacoes: e.target.value})}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="justificativa">Justificativa da Sugestão</Label>
-                  <Textarea
-                    id="justificativa"
-                    placeholder="Explique por que esta sugestão é importante e qual problema resolve..."
-                    value={formData.justificativa}
-                    onChange={(e) => setFormData({...formData, justificativa: e.target.value})}
-                    className="min-h-[100px]"
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Submit */}
-            <div className="flex justify-end space-x-4">
-              <Button variant="outline" type="button" asChild>
-                <Link to="/">Cancelar</Link>
-              </Button>
-              <Button type="submit" className="glow-primary">
-                <Send className="mr-2 h-4 w-4" />
-                Enviar Sugestão
-              </Button>
-            </div>
-          </form>
+              </form>
+            </CardContent>
+          </Card>
         </div>
+
+        {/* Success Modal */}
+        <Dialog open={showSuccessModal} onOpenChange={setShowSuccessModal}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center space-x-2">
+                <CheckCircle className="h-5 w-5 text-green-500" />
+                <span>Sugestão Enviada!</span>
+              </DialogTitle>
+              <DialogDescription>
+                Sua sugestão foi enviada com sucesso e está sendo analisada pela equipe.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => navigate(-1)}>
+                Voltar
+              </Button>
+              <Button onClick={() => {
+                setShowSuccessModal(false);
+                setForm({
+                  modo: "criacao",
+                  escopo: "area",
+                  nome: "",
+                  descricao: "",
+                  justificativa: ""
+                });
+              }}>
+                Nova Sugestão
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );

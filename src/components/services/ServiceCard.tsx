@@ -16,6 +16,8 @@ interface ServiceCardProps {
     sla: string;
     status: "Ativo" | "Inativo";
     demandaRotina: "Demanda" | "Rotina";
+    subprocessoId?: string;
+    processoId?: string;
   };
 }
 
@@ -37,7 +39,12 @@ export function ServiceCard({ service }: ServiceCardProps) {
               {" > "}
               <span className="text-muted-foreground">{service.processo}</span>
               {" > "}
-              <span className="text-muted-foreground">{service.subprocesso}</span>
+              <Link 
+                to={`/processos/${service.processoId || service.processo}/subprocessos/${service.subprocessoId || service.subprocesso}`}
+                className="text-muted-foreground hover:text-primary transition-colors"
+              >
+                {service.subprocesso}
+              </Link>
             </CardDescription>
           </div>
           <Badge variant={statusVariant} className={statusColor}>

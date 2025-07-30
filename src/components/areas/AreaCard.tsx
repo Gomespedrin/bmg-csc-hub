@@ -9,11 +9,13 @@ interface AreaCardProps {
   area: {
     id: string;
     nome: string;
-    descricao: string;
+    descricao?: string;
     quantidadeServicos: number;
-    processos: string[];
+    processos: any[];
     icone?: string;
   };
+  viewMode?: "grid" | "list" | "compact" | "detailed";
+  showDetails?: boolean;
 }
 
 const getAreaIcon = (areaName: string) => {
@@ -69,7 +71,7 @@ export function AreaCard({ area }: AreaCardProps) {
                     variant="outline" 
                     className="text-xs border-muted-foreground/20 text-muted-foreground"
                   >
-                    {processo}
+                    {typeof processo === 'string' ? processo : processo.nome}
                   </Badge>
                 ))}
                 {area.processos.length > 3 && (

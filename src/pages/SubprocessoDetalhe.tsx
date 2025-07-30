@@ -1,0 +1,190 @@
+import { useParams, Link } from "react-router-dom";
+import { Header } from "@/components/layout/Header";
+import { ServiceCard } from "@/components/services/ServiceCard";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { ArrowLeft, Settings, Clock, Target, Users, FileText, AlertCircle, CheckCircle } from "lucide-react";
+import { useServicos } from "@/hooks/useServicos";
+import { useAreas } from "@/hooks/useAreas";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+
+export default function SubprocessoDetalhe() {
+  const { processoId, subprocessoId } = useParams();
+  const { data: servicosData, isLoading } = useServicos();
+  const { data: areas } = useAreas();
+
+  // Encontrar o subprocesso específico
+  const subprocesso = areas?.flatMap(area => 
+    area.processos?.flatMap(processo => 
+      processo.subprocessos?.map(sub => ({
+        ...sub,
+        processo: processo,
+        area: area
+      })) || []
+    ) || []
+  ).find(sub => sub.id === subprocessoId);
+
+  // Filtrar serviços do subprocesso
+  const servicos = (servicosData as any)?.services || [];
+  const servicosDoSubprocesso = servicos.filter((servico: any) => 
+    servico.subprocesso.id === subprocessoId
+  );
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container mx-auto px-6 py-8">
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Carregando subprocesso...</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (!subprocesso) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container mx-auto px-6 py-8">
+          <div className="text-center py-12">
+            <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-foreground mb-2">
+              Subprocesso não encontrado
+            </h3>
+            <p className="text-muted-foreground mb-4">
+              O subprocesso solicitado não foi encontrado ou não está disponível.
+            </p>
+            <Button asChild>
+              <Link to="/servicos">Voltar aos Serviços</Link>
+            </Button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  const area = subprocesso.area;
+  const processo = subprocesso.processo;
+
+  // Formatar serviços para ServiceCard
+  const formattedServicos = servicosDoSubprocesso.map((servico: any) => ({
+    id: servico.id,
+    produto: servico.produto,
+    subprocesso: servico.subprocesso.nome,
+    processo: servico.subprocesso.processo.nome,
+    area: servico.subprocesso.processo.area.nome,
+    tempoMedio: servico.tempo_medio ? `${Math.ceil(servico.tempo_medio / 60)} dias` : '1 dia',
+    sla: servico.sla ? `${servico.sla} horas` : '24 horas',
+    status: (servico.status === 'ativo' ? 'Ativo' : 'Inativo') as "Ativo" | "Inativo",
+    demandaRotina: (servico.demanda_rotina as "Demanda" | "Rotina") || 'Demanda'
+  }));
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Header />
+      
+      <main className="container mx-auto px-6 py-8">
+        {/* Breadcrumb */}
+        <Breadcrumb className="mb-6">
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link to="/">Início</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link to="/por-area">{area?.nome}</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbLink href="#">{processo?.nome}</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>{subprocesso.nome}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+
+        {/* Back Button */}
+        <Button variant="ghost" asChild className="mb-6">
+          <Link to="/servicos">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Voltar aos Serviços
+          </Link>
+        </Button>
+
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex items-start justify-between mb-6">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground mb-2">
+                {subprocesso.nome}
+              </h1>
+              <p className="text-lg text-muted-foreground mb-4">
+                {subprocesso.descricao || 'Subprocesso do ' + processo?.nome}
+              </p>
+              
+              {/* Stats */}
+              <div className="flex items-center space-x-6">
+                <div className="flex items-center space-x-2">
+                  <Settings className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">
+                    {formattedServicos.length} serviço{formattedServicos.length !== 1 ? 's' : ''}
+                  </span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">
+                    Processo: {processo?.nome}
+                  </span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Target className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">
+                    Área: {area?.nome}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Services Grid */}
+        {formattedServicos.length === 0 ? (
+          <div className="text-center py-12">
+            <FileText className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Nenhum serviço encontrado</h3>
+            <p className="text-muted-foreground">
+              Este subprocesso não possui serviços cadastrados.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {formattedServicos.map((servico) => (
+              <ServiceCard
+                key={servico.id}
+                service={servico}
+              />
+            ))}
+          </div>
+        )}
+      </main>
+    </div>
+  );
+} 

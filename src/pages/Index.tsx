@@ -11,11 +11,15 @@ import { useAreas } from "@/hooks/useAreas";
 import heroImage from "@/assets/hero-portal-csc.jpg";
 
 const Index = () => {
-  const { data: servicos, isLoading: servicosLoading } = useServicos();
+  const { data: servicosData, isLoading: servicosLoading } = useServicos();
   const { data: areas, isLoading: areasLoading } = useAreas();
 
+  // Extrair dados dos serviços
+  const servicos = (servicosData as any)?.services || [];
+  const totalServicos = (servicosData as any)?.totalItems || 0;
+
   // Convert servicos data for ServiceCard component
-  const formattedServicos = (servicos || []).map(servico => ({
+  const formattedServicos = servicos.map((servico: any) => ({
     id: servico.id,
     produto: servico.produto,
     subprocesso: servico.subprocesso.nome,
@@ -29,7 +33,6 @@ const Index = () => {
 
   const featuredServicos = formattedServicos.slice(0, 2);
   const featuredAreas = areas?.slice(0, 2) || [];
-  const totalServicos = servicos?.length || 0;
   const totalAreas = areas?.length || 0;
 
   return (

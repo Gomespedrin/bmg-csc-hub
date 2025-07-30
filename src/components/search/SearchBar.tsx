@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -20,28 +20,46 @@ interface SearchBarProps {
   placeholder?: string;
   className?: string;
   showSuggestions?: boolean;
+  onSearchChange?: (value: string) => void;
 }
 
 export function SearchBar({ 
   placeholder = "Buscar serviços, processos, áreas...", 
   className = "",
-  showSuggestions = true 
+  showSuggestions = true,
+  onSearchChange
 }: SearchBarProps) {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState("");
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
+  const [debouncedValue, setDebouncedValue] = useState("");
   const navigate = useNavigate();
+  const inputRef = useRef<HTMLInputElement>(null);
   
-  const { data: servicos } = useServicos();
+  const { data: servicosData } = useServicos();
   const { data: areas } = useAreas();
+
+  // Debounce do valor de pesquisa
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedValue(value);
+      // Notificar componente pai sobre mudança
+      if (onSearchChange) {
+        onSearchChange(value);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [value, onSearchChange]);
 
   // Generate suggestions from real data
   const generateSuggestions = (): SearchSuggestion[] => {
     const allSuggestions: SearchSuggestion[] = [];
 
     // Add services
-    if (servicos) {
-      servicos.forEach(servico => {
+    const servicos = (servicosData as any)?.services || [];
+    if (servicos.length > 0) {
+      servicos.forEach((servico: any) => {
         allSuggestions.push({
           id: servico.id,
           type: "produto",
@@ -81,9 +99,9 @@ export function SearchBar({
     }
 
     // Add subprocesses from services
-    if (servicos) {
+    if (servicos.length > 0) {
       const uniqueSubprocesses = new Map();
-      servicos.forEach(servico => {
+      servicos.forEach((servico: any) => {
         const key = servico.subprocesso.id;
         if (!uniqueSubprocesses.has(key)) {
           uniqueSubprocesses.set(key, {
@@ -104,25 +122,31 @@ export function SearchBar({
   };
 
   useEffect(() => {
-    if (value.length >= 2) {
-      // Simulate API call delay
-      const timer = setTimeout(() => {
-        const allSuggestions = generateSuggestions();
-        const filtered = allSuggestions.filter(
-          suggestion => 
-            suggestion.title.toLowerCase().includes(value.toLowerCase()) ||
-            suggestion.subtitle.toLowerCase().includes(value.toLowerCase())
-        );
-        setSuggestions(filtered.slice(0, 8)); // Limit to 8 suggestions
-        setOpen(showSuggestions && filtered.length > 0);
-      }, 200);
-
-      return () => clearTimeout(timer);
+    if (debouncedValue.length >= 2) {
+      const allSuggestions = generateSuggestions();
+      const searchTerm = debouncedValue.toLowerCase();
+      
+      const filtered = allSuggestions.filter(suggestion => {
+        const titleMatch = suggestion.title.toLowerCase().includes(searchTerm);
+        const subtitleMatch = suggestion.subtitle.toLowerCase().includes(searchTerm);
+        return titleMatch || subtitleMatch;
+      });
+      
+      setSuggestions(filtered.slice(0, 8)); // Limit to 8 suggestions
+      setOpen(showSuggestions && filtered.length > 0);
+      
+      console.log("🔍 Search suggestions:", { 
+        debouncedValue, 
+        searchTerm,
+        totalSuggestions: allSuggestions.length, 
+        filteredSuggestions: filtered.length,
+        suggestions: filtered.slice(0, 3) // Log first 3 for debugging
+      });
     } else {
       setSuggestions([]);
       setOpen(false);
     }
-  }, [value, showSuggestions, servicos, areas]);
+  }, [debouncedValue, showSuggestions, servicosData, areas]);
 
   const handleSelect = (suggestion: SearchSuggestion) => {
     setValue(suggestion.title);
@@ -141,6 +165,15 @@ export function SearchBar({
     if (e.key === "Enter") {
       e.preventDefault();
       handleSearch();
+    } else if (e.key === "Escape") {
+      setOpen(false);
+      inputRef.current?.blur();
+    }
+  };
+
+  const handleInputFocus = () => {
+    if (debouncedValue.length >= 2 && suggestions.length > 0) {
+      setOpen(true);
     }
   };
 
@@ -156,23 +189,30 @@ export function SearchBar({
 
   return (
     <div className={`relative ${className}`}>
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover open={open} onOpenChange={setOpen} modal={false}>
         <PopoverTrigger asChild>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
+              ref={inputRef}
               placeholder={placeholder}
               value={value}
               onChange={(e) => setValue(e.target.value)}
               onKeyDown={handleKeyDown}
+              onFocus={handleInputFocus}
               className="pl-10 pr-10 bg-muted/50 border-muted focus:bg-card transition-smooth"
+              autoComplete="off"
             />
             {value && (
               <Button
                 variant="ghost"
                 size="sm"
                 className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
-                onClick={() => setValue("")}
+                onClick={() => {
+                  setValue("");
+                  setOpen(false);
+                  inputRef.current?.focus();
+                }}
               >
                 <X className="h-3 w-3" />
               </Button>
@@ -180,8 +220,12 @@ export function SearchBar({
           </div>
         </PopoverTrigger>
         
-        {showSuggestions && (
-          <PopoverContent className="w-[400px] p-0" align="start">
+        {showSuggestions && open && (
+          <PopoverContent 
+            className="w-[400px] p-0" 
+            align="start"
+            onOpenAutoFocus={(e) => e.preventDefault()}
+          >
             <Command>
               <CommandList>
                 <CommandEmpty>Nenhum resultado encontrado.</CommandEmpty>

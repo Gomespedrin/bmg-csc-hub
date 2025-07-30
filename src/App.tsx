@@ -8,6 +8,7 @@ import PorArea from "./pages/PorArea";
 import Servicos from "./pages/Servicos";
 import ServicoDetalhe from "./pages/ServicoDetalhe";
 import AreaDetalhe from "./pages/AreaDetalhe";
+import SubprocessoDetalhe from "./pages/SubprocessoDetalhe";
 import NovaSugestao from "./pages/NovaSugestao";
 import AdminSugestoes from "./pages/AdminSugestoes";
 import NotFound from "./pages/NotFound";
@@ -26,6 +27,7 @@ const App = () => (
           <Route path="/servicos" element={<Servicos />} />
           <Route path="/servicos/:slug" element={<ServicoDetalhe />} />
           <Route path="/areas/:slug" element={<AreaDetalhe />} />
+          <Route path="/processos/:processoId/subprocessos/:subprocessoId" element={<SubprocessoDetalhe />} />
           <Route path="/sugestoes/nova" element={<NovaSugestao />} />
           <Route path="/admin/sugestoes" element={<AdminSugestoes />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
