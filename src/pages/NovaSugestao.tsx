@@ -12,6 +12,8 @@ import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ArrowLeft, Plus, Edit, FileText, CheckCircle, AlertCircle } from "lucide-react";
 import { useAreas, useAreaById } from "@/hooks/useAreas";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { useCreateSugestao } from "@/hooks/useSugestoes";
 import { supabase } from "@/integrations/supabase/client";
 
 type SugestaoMode = "criacao" | "edicao";
@@ -32,7 +34,9 @@ interface SugestaoForm {
 
 export default function NovaSugestao() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { data: areas } = useAreas();
+  const createSugestao = useCreateSugestao();
   
   const [form, setForm] = useState<SugestaoForm>({
     modo: "criacao",
@@ -44,7 +48,7 @@ export default function NovaSugestao() {
   
   const { data: areaCompleta } = useAreaById(form.areaId || "");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmitting = createSugestao.isPending;
 
   // Estados para dados hierárquicos
   const [processos, setProcessos] = useState<any[]>([]);
@@ -83,12 +87,19 @@ export default function NovaSugestao() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
+    
+    if (!user) {
+      alert("Você precisa estar logado para enviar uma sugestão.");
+      return;
+    }
+
+    console.log("Iniciando envio de sugestão...");
+    console.log("Usuário:", user.id);
+    console.log("Form:", form);
 
     try {
       const sugestaoData = {
-        tipo: `${form.modo}_${form.escopo}`,
-        criado_por: "usuario_atual", // TODO: Implementar autenticação
+        tipo: form.modo === "criacao" ? "novo" : "edicao",
         dados_sugeridos: {
           modo: form.modo,
           escopo: form.escopo,
@@ -100,26 +111,17 @@ export default function NovaSugestao() {
           descricao: form.descricao,
           dados_atuais: form.dadosAtuais
         },
-        justificativa: form.justificativa,
-        status: "pendente",
-        created_at: new Date().toISOString()
+        justificativa: form.justificativa
       };
 
-      const { error } = await supabase
-        .from("sugestoes")
-        .insert([sugestaoData]);
+      console.log("Dados da sugestão:", sugestaoData);
 
-      if (error) {
-        console.error("Erro ao salvar sugestão:", error);
-        throw error;
-      }
-
+      await createSugestao.mutateAsync(sugestaoData);
+      console.log("Sugestão enviada com sucesso!");
       setShowSuccessModal(true);
     } catch (error) {
       console.error("Erro ao enviar sugestão:", error);
       alert("Erro ao enviar sugestão. Tente novamente.");
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -193,17 +195,40 @@ export default function NovaSugestao() {
     );
 
     if (form.modo === "criacao") {
-      // Para criação, os níveis superiores são obrigatórios
-      const hasRequiredHierarchy = form.areaId && 
-        (form.escopo === "area" || form.processoId) &&
-        (form.escopo === "processo" || form.subprocessoId) &&
-        (form.escopo === "subprocesso" || form.servicoId);
+      // Para criação, verificar hierarquia baseada no escopo
+      let hasRequiredHierarchy = true;
       
-      return hasRequiredFields && hasRequiredHierarchy;
+      if (form.escopo === "area") {
+        // Para criar área, não precisa selecionar nada na hierarquia
+        hasRequiredHierarchy = true;
+      } else if (form.escopo === "processo") {
+        // Para criar processo, precisa selecionar área
+        hasRequiredHierarchy = !!form.areaId;
+      } else if (form.escopo === "subprocesso") {
+        // Para criar subprocesso, precisa selecionar área e processo
+        hasRequiredHierarchy = !!form.areaId && !!form.processoId;
+      } else if (form.escopo === "servico") {
+        // Para criar serviço, precisa selecionar área, processo e subprocesso
+        hasRequiredHierarchy = !!form.areaId && !!form.processoId && !!form.subprocessoId;
+      }
+      
+      const isValid = hasRequiredFields && hasRequiredHierarchy;
+      console.log("isFormValid - Criação:", { 
+        hasRequiredFields, 
+        hasRequiredHierarchy, 
+        isValid,
+        escopo: form.escopo,
+        areaId: form.areaId,
+        processoId: form.processoId,
+        subprocessoId: form.subprocessoId
+      });
+      return isValid;
     } else {
       // Para edição, apenas o item-alvo é obrigatório
       const hasTargetItem = form.areaId || form.processoId || form.subprocessoId || form.servicoId;
-      return hasRequiredFields && hasTargetItem;
+      const isValid = hasRequiredFields && hasTargetItem;
+      console.log("isFormValid - Edição:", { hasRequiredFields, hasTargetItem, isValid });
+      return isValid;
     }
   };
 
@@ -302,25 +327,26 @@ export default function NovaSugestao() {
                   <h3 className="text-lg font-semibold">Hierarquia</h3>
                   
                   {/* Área */}
-                  <div className="space-y-2">
-                    <Label>Área {form.modo === "criacao" && form.escopo !== "area" && "*"}</Label>
-                    <Select 
-                      value={form.areaId || ""} 
-                      onValueChange={(value) => handleItemSelect(value, "area")}
-                      disabled={false}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione uma área" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {areas?.map(area => (
-                          <SelectItem key={area.id} value={area.id}>
-                            {area.nome}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  {form.escopo !== "area" && (
+                    <div className="space-y-2">
+                      <Label>Área {form.modo === "criacao" && "*"}</Label>
+                      <Select 
+                        value={form.areaId || ""} 
+                        onValueChange={(value) => handleItemSelect(value, "area")}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione uma área" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {areas?.map(area => (
+                            <SelectItem key={area.id} value={area.id}>
+                              {area.nome}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
 
                   {/* Processo */}
                   {form.escopo !== "area" && (
@@ -329,7 +355,7 @@ export default function NovaSugestao() {
                       <Select 
                         value={form.processoId || ""} 
                         onValueChange={(value) => handleItemSelect(value, "processo")}
-                        disabled={!form.areaId}
+                        disabled={!form.areaId || (form.modo === "criacao" && form.escopo === "processo")}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Selecione um processo" />
@@ -352,7 +378,7 @@ export default function NovaSugestao() {
                       <Select 
                         value={form.subprocessoId || ""} 
                         onValueChange={(value) => handleItemSelect(value, "subprocesso")}
-                        disabled={!form.processoId}
+                        disabled={!form.processoId || (form.modo === "criacao" && form.escopo === "subprocesso")}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Selecione um subprocesso" />
@@ -375,7 +401,7 @@ export default function NovaSugestao() {
                       <Select 
                         value={form.servicoId || ""} 
                         onValueChange={(value) => handleItemSelect(value, "servico")}
-                        disabled={!form.subprocessoId}
+                        disabled={!form.subprocessoId || (form.modo === "criacao" && form.escopo === "servico")}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Selecione um serviço" />
@@ -464,6 +490,7 @@ export default function NovaSugestao() {
                   <Button 
                     type="submit" 
                     disabled={!isFormValid() || isSubmitting}
+                    onClick={() => console.log("Botão Enviar Sugestão clicado")}
                   >
                     {isSubmitting ? "Enviando..." : "Enviar Sugestão"}
                   </Button>

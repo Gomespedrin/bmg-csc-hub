@@ -1,150 +1,155 @@
-# BMG CSC Hub
+# Portal CSC - Centro de Serviços Compartilhados
 
-Portal do Centro de Serviços Compartilhados do Grupo BMG - Centralize, consulte e gerencie todos os serviços organizacional.
+Sistema de catálogo de serviços para o Grupo BMG, permitindo visualização, busca e gestão de serviços organizacionais.
 
-## 🚀 Funcionalidades
+## Funcionalidades
 
-- **Catálogo de Serviços**: Explore todos os serviços disponíveis organizados por área, processo e subprocesso
-- **Navegação Intuitiva**: URLs amigáveis baseadas em nomes ao invés de UUIDs
-- **Busca Avançada**: Filtros por área, processo, subprocesso e status
-- **Sugestões**: Sistema para sugerir novos serviços ou melhorias
-- **Interface Moderna**: Design responsivo e acessível
+### Para Usuários Comuns
+- **Visualização de Serviços**: Navegação por áreas, processos e subprocessos
+- **Busca Avançada**: Filtros por área, processo, tipo de demanda, etc.
+- **Detalhes dos Serviços**: Informações completas sobre cada serviço
+- **Sugestões**: Envio de sugestões para novos serviços ou melhorias
+- **Acompanhamento**: Visualização do status das sugestões enviadas
 
-## 🔗 URLs Amigáveis
+### Para Administradores
+- **Gestão do Catálogo**: CRUD completo para Áreas, Processos, Subprocessos e Serviços
+- **Aprovação de Sugestões**: Revisão e aprovação/rejeição de sugestões
+- **Interface Administrativa**: Painel dedicado para gestão do catálogo
 
-O sistema agora usa URLs amigáveis baseadas nos nomes das entidades, tornando a navegação muito mais intuitiva:
+## Estrutura do Sistema
 
-### Exemplos de URLs:
-
-**Antes (com UUIDs):**
-```
-/areas/123e4567-e89b-12d3-a456-426614174000
-/servicos/987fcdeb-51a2-43d1-9f12-345678901234
-```
-
-**Agora (com slugs):**
-```
-/areas/recursos-humanos-123e4567-e89b-12d3-a456-426614174000
-/servicos/abertura-de-conta-pj-987fcdeb-51a2-43d1-9f12-345678901234
-```
-
-### Estrutura das URLs:
-
-- **Áreas**: `/areas/{nome-da-area}-{id}`
-  - Ex: `/areas/recursos-humanos-123e4567-e89b-12d3-a456-426614174000`
-  - Ex: `/areas/tecnologia-da-informacao-456e7890-f12c-34d5-b678-901234567890`
-
-- **Serviços**: `/servicos/{nome-do-servico}-{id}`
-  - Ex: `/servicos/abertura-de-conta-pj-987fcdeb-51a2-43d1-9f12-345678901234`
-  - Ex: `/servicos/processamento-de-folha-abc123def-456g-789h-012i-345678901234`
-
-### Benefícios:
-
-1. **Intuitividade**: As URLs mostram claramente o que contêm
-2. **SEO**: Melhor para motores de busca
-3. **Compartilhamento**: URLs mais fáceis de compartilhar
-4. **Navegação**: Usuários podem entender a estrutura da URL
-5. **Manutenção**: Mais fácil de debugar e manter
-
-## 🛠️ Tecnologias
-
-- **Frontend**: React + TypeScript + Vite
-- **UI**: Shadcn/ui + Tailwind CSS
-- **Backend**: Supabase (PostgreSQL)
-- **Estado**: TanStack Query (React Query)
-- **Roteamento**: React Router DOM
-
-## 📦 Instalação
-
-```bash
-# Clone o repositório
-git clone [url-do-repositorio]
-
-# Instale as dependências
-npm install
-
-# Configure as variáveis de ambiente
-cp .env.example .env.local
-
-# Execute o projeto
-npm run dev
-```
-
-## 🗄️ Estrutura do Banco
-
-O sistema segue uma hierarquia clara:
-
+### Hierarquia
 ```
 Área → Processo → Subprocesso → Serviço
 ```
 
-### Tabelas Principais:
+### Módulos Administrativos
+1. **Áreas**: Gestão das áreas organizacionais
+2. **Processos**: Gestão dos processos dentro de cada área
+3. **Subprocessos**: Gestão dos subprocessos dentro de cada processo
+4. **Serviços**: Gestão dos serviços finais do catálogo
 
-- **areas**: Áreas organizacionais
-- **processos**: Processos dentro de cada área
-- **subprocessos**: Subprocessos dentro de cada processo
-- **servicos**: Serviços específicos oferecidos
-- **sugestoes**: Sugestões de novos serviços ou melhorias
+### Fluxo de Sugestões
+1. **Envio**: Usuários enviam sugestões para novos serviços ou melhorias
+2. **Revisão**: Administradores revisam as sugestões pendentes
+3. **Aprovação/Rejeição**: Administradores aprovam ou rejeitam com comentários
+4. **Processamento Automático**: Sugestões aprovadas são automaticamente inseridas no catálogo
 
-## 🎯 Funcionalidades Principais
+## Tecnologias Utilizadas
 
-### 1. Navegação por Área
-- Visualize todas as áreas disponíveis
-- Acesse detalhes específicos de cada área
-- Veja processos e serviços relacionados
+- **Frontend**: React + TypeScript + Vite
+- **UI**: Tailwind CSS + shadcn/ui
+- **Backend**: Supabase (PostgreSQL + Auth + Storage)
+- **Estado**: TanStack Query (React Query)
+- **Roteamento**: React Router
 
-### 2. Catálogo de Serviços
-- Lista completa de todos os serviços
-- Filtros avançados por área, processo, status
-- Busca por nome do serviço
-- Visualização em grid ou lista
+## Instalação e Configuração
 
-### 3. Detalhes do Serviço
-- Informações completas sobre cada serviço
-- Tempo médio, SLA, requisitos
-- Breadcrumb de navegação
-- Links para serviços relacionados
+### Pré-requisitos
+- Node.js 18+
+- npm ou yarn
+- Conta no Supabase
 
-### 4. Sistema de Sugestões
-- Sugerir novos serviços
-- Propor melhorias em serviços existentes
-- Acompanhamento de status das sugestões
+### Configuração
 
-## 🔧 Desenvolvimento
-
-### Scripts Disponíveis:
-
+1. **Clone o repositório**
 ```bash
-npm run dev          # Servidor de desenvolvimento
-npm run build        # Build de produção
-npm run preview      # Preview do build
-npm run lint         # Linting do código
+git clone <repository-url>
+cd bmg-csc-hub-1
 ```
 
-### Estrutura de Pastas:
+2. **Instale as dependências**
+```bash
+npm install
+```
+
+3. **Configure as variáveis de ambiente**
+```bash
+cp .env.example .env
+```
+
+Edite o arquivo `.env` com suas credenciais do Supabase:
+```
+VITE_SUPABASE_URL=sua_url_do_supabase
+VITE_SUPABASE_ANON_KEY=sua_chave_anonima_do_supabase
+```
+
+4. **Execute as migrações do banco**
+```bash
+npx supabase db push
+```
+
+5. **Inicie o servidor de desenvolvimento**
+```bash
+npm run dev
+```
+
+## Estrutura do Projeto
 
 ```
 src/
-├── components/      # Componentes reutilizáveis
-├── hooks/          # Hooks customizados
-├── pages/          # Páginas da aplicação
-├── lib/            # Utilitários e configurações
-├── integrations/   # Integrações externas (Supabase)
-└── assets/         # Recursos estáticos
+├── components/
+│   ├── auth/           # Componentes de autenticação
+│   ├── layout/         # Componentes de layout
+│   ├── ui/            # Componentes UI reutilizáveis
+│   └── ...
+├── hooks/             # Hooks customizados
+├── integrations/      # Integrações externas
+├── pages/            # Páginas da aplicação
+└── ...
 ```
 
-## 📝 Contribuição
+## Rotas Principais
 
-1. Fork o projeto
+- `/` - Página inicial
+- `/por-area` - Visualização por áreas
+- `/servicos` - Lista de todos os serviços
+- `/minhas-sugestoes` - Sugestões do usuário logado
+- `/admin/catalogo` - Administração do catálogo (apenas admins)
+- `/admin/sugestoes` - Administração de sugestões (apenas admins)
+
+## Perfis de Usuário
+
+### Colaborador
+- Visualizar serviços
+- Enviar sugestões
+- Acompanhar suas sugestões
+
+### Administrador
+- Todas as funcionalidades do colaborador
+- Gestão completa do catálogo
+- Aprovação de sugestões
+
+### Super Administrador
+- Todas as funcionalidades do administrador
+- Gestão de usuários e perfis
+
+## Funcionalidades Administrativas
+
+### Gestão do Catálogo
+- **Criar/Editar/Excluir** Áreas, Processos, Subprocessos e Serviços
+- **Validação de Dados** em todos os formulários
+- **Interface Responsiva** com menu lateral fixo
+- **Busca e Filtros** para facilitar a gestão
+
+### Gestão de Sugestões
+- **Visualização** de todas as sugestões pendentes
+- **Aprovação/Rejeição** com comentários
+- **Processamento Automático** de sugestões aprovadas
+- **Histórico** de decisões administrativas
+
+## Contribuição
+
+1. Faça um fork do projeto
 2. Crie uma branch para sua feature (`git checkout -b feature/AmazingFeature`)
 3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
 4. Push para a branch (`git push origin feature/AmazingFeature`)
 5. Abra um Pull Request
 
-## 📄 Licença
+## Licença
 
-Este projeto está sob a licença MIT. Veja o arquivo `LICENSE` para mais detalhes.
+Este projeto é propriedade do Grupo BMG e não está disponível para uso público.
 
-## 🤝 Suporte
+## Suporte
 
-Para suporte, envie um email para [email] ou abra uma issue no repositório.
+Para dúvidas ou suporte técnico, entre em contato com a equipe de desenvolvimento.

@@ -22,6 +22,8 @@ export default function SubprocessoDetalhe() {
   const { data: servicosData, isLoading } = useServicos();
   const { data: areas } = useAreas();
 
+  console.log("🔍 SubprocessoDetalhe - Parâmetros:", { processoId, subprocessoId });
+
   // Encontrar o subprocesso específico
   const subprocesso = areas?.flatMap(area => 
     area.processos?.flatMap(processo => 
@@ -33,11 +35,19 @@ export default function SubprocessoDetalhe() {
     ) || []
   ).find(sub => sub.id === subprocessoId);
 
+  console.log("🔍 SubprocessoDetalhe - Subprocesso encontrado:", subprocesso);
+
   // Filtrar serviços do subprocesso
   const servicos = (servicosData as any)?.services || [];
   const servicosDoSubprocesso = servicos.filter((servico: any) => 
     servico.subprocesso.id === subprocessoId
   );
+
+  console.log("🔍 SubprocessoDetalhe - Serviços:", {
+    totalServicos: servicos.length,
+    servicosDoSubprocesso: servicosDoSubprocesso.length,
+    subprocessoId
+  });
 
   if (isLoading) {
     return (
@@ -107,12 +117,14 @@ export default function SubprocessoDetalhe() {
             <BreadcrumbSeparator />
             <BreadcrumbItem>
               <BreadcrumbLink asChild>
-                <Link to="/por-area">{area?.nome}</Link>
+                <Link to={`/areas/${area?.id}`}>{area?.nome}</Link>
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <BreadcrumbLink href="#">{processo?.nome}</BreadcrumbLink>
+              <BreadcrumbLink asChild>
+                <Link to={`/processos/${processo?.id}`}>{processo?.nome}</Link>
+              </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>

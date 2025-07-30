@@ -10,14 +10,41 @@ export const useIsAdmin = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return false;
 
-      const { data } = await supabase
-        .from('profiles')
-        .select('perfil')
-        .eq('user_id', user.id)
-        .single();
+      try {
+        // Primeiro, tentar buscar apenas perfil
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('perfil')
+          .eq('user_id', user.id)
+          .single();
 
-      return data?.perfil === 'administrador' || data?.perfil === 'superadministrador';
+        if (error) {
+          if (error.code === 'PGRST116') {
+            // Perfil não encontrado - usuário não tem perfil ainda
+            console.log('Perfil não encontrado para o usuário:', user.id);
+            return false;
+          }
+          console.error('Erro ao verificar perfil:', error);
+          return false;
+        }
+
+        // Verificar se é administrador baseado no perfil
+        const perfil = data?.perfil;
+        const isAdmin = perfil === 'administrador' || perfil === 'superadministrador';
+
+        console.log('Verificação de admin:', { user_id: user.id, perfil, isAdmin });
+        
+        return isAdmin;
+      } catch (error) {
+        console.error('Erro ao verificar perfil:', error);
+        return false;
+      }
     },
+    enabled: true, // Sempre executar quando o hook for chamado
+    staleTime: 5 * 60 * 1000, // 5 minutos
+    gcTime: 10 * 60 * 1000, // 10 minutos
+    retry: 1, // Tentar apenas uma vez
+    retryDelay: 1000, // Esperar 1 segundo antes de tentar novamente
   });
 };
 

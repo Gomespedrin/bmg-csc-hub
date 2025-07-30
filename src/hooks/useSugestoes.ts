@@ -46,8 +46,12 @@ export const useCreateSugestao = () => {
       justificativa?: string;
       servico_id?: string;
     }) => {
+      console.log("useCreateSugestao - Iniciando mutation");
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuário não autenticado');
+
+      console.log("useCreateSugestao - Usuário autenticado:", user.id);
+      console.log("useCreateSugestao - Dados da sugestão:", sugestao);
 
       const { data, error } = await supabase
         .from('sugestoes')
@@ -58,11 +62,20 @@ export const useCreateSugestao = () => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error("useCreateSugestao - Erro do Supabase:", error);
+        throw error;
+      }
+      
+      console.log("useCreateSugestao - Sugestão criada com sucesso:", data);
       return data;
     },
     onSuccess: () => {
+      console.log("useCreateSugestao - onSuccess executado");
       queryClient.invalidateQueries({ queryKey: ['sugestoes'] });
+    },
+    onError: (error) => {
+      console.error("useCreateSugestao - onError:", error);
     },
   });
 };
@@ -83,6 +96,63 @@ export const useUpdateSugestao = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuário não autenticado');
 
+      // Se a sugestão foi aprovada, processar automaticamente
+      if (status === 'aprovada') {
+        // Buscar a sugestão para obter os dados
+        const { data: sugestao } = await supabase
+          .from('sugestoes')
+          .select('*')
+          .eq('id', id)
+          .single();
+
+        if (sugestao) {
+          if (sugestao.tipo === 'novo') {
+            // Criar novo serviço
+            const { data: servico, error: servicoError } = await supabase
+              .from('servicos')
+              .insert({
+                produto: sugestao.dados_sugeridos.produto,
+                o_que_e: sugestao.dados_sugeridos.oQueE,
+                quem_pode_utilizar: sugestao.dados_sugeridos.quemPodeUtilizar,
+                tempo_medio: sugestao.dados_sugeridos.tempoMedio,
+                unidade_medida: sugestao.dados_sugeridos.unidadeMedida,
+                sla: sugestao.dados_sugeridos.sla,
+                sli: sugestao.dados_sugeridos.sli,
+                demanda_rotina: sugestao.dados_sugeridos.demandaRotina,
+                requisitos_operacionais: sugestao.dados_sugeridos.requisitosOperacionais,
+                observacoes: sugestao.dados_sugeridos.observacoes,
+                subprocesso_id: sugestao.dados_sugeridos.subprocesso_id,
+                created_by: user.id,
+                status: 'ativo'
+              })
+              .select()
+              .single();
+
+            if (servicoError) throw servicoError;
+          } else if (sugestao.tipo === 'edicao' && sugestao.servico_id) {
+            // Atualizar serviço existente
+            const { error: servicoError } = await supabase
+              .from('servicos')
+              .update({
+                produto: sugestao.dados_sugeridos.produto,
+                o_que_e: sugestao.dados_sugeridos.oQueE,
+                quem_pode_utilizar: sugestao.dados_sugeridos.quemPodeUtilizar,
+                tempo_medio: sugestao.dados_sugeridos.tempoMedio,
+                unidade_medida: sugestao.dados_sugeridos.unidadeMedida,
+                sla: sugestao.dados_sugeridos.sla,
+                sli: sugestao.dados_sugeridos.sli,
+                demanda_rotina: sugestao.dados_sugeridos.demandaRotina,
+                requisitos_operacionais: sugestao.dados_sugeridos.requisitosOperacionais,
+                observacoes: sugestao.dados_sugeridos.observacoes,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', sugestao.servico_id);
+
+            if (servicoError) throw servicoError;
+          }
+        }
+      }
+
       const { data, error } = await supabase
         .from('sugestoes')
         .update({
@@ -100,6 +170,7 @@ export const useUpdateSugestao = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sugestoes'] });
+      queryClient.invalidateQueries({ queryKey: ['servicos'] });
     },
   });
 };

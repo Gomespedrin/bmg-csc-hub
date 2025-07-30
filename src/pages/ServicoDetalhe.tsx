@@ -77,16 +77,20 @@ export default function ServicoDetalhe() {
             <BreadcrumbSeparator />
             <BreadcrumbItem>
               <BreadcrumbLink asChild>
-                <Link to="/por-area">{area?.nome}</Link>
+                <Link to={`/areas/${area?.id}`}>{area?.nome}</Link>
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <BreadcrumbLink href="#">{processo?.nome}</BreadcrumbLink>
+              <BreadcrumbLink asChild>
+                <Link to={`/processos/${processo?.id}`}>{processo?.nome}</Link>
+              </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <BreadcrumbLink href="#">{subprocesso?.nome}</BreadcrumbLink>
+              <BreadcrumbLink asChild>
+                <Link to={`/processos/${processo?.id}/subprocessos/${subprocesso?.id}`}>{subprocesso?.nome}</Link>
+              </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
@@ -252,7 +256,7 @@ export default function ServicoDetalhe() {
                   </Link>
                 </Button>
                 <Button variant="outline" className="w-full" asChild>
-                  <Link to={`/por-area`}>
+                  <Link to={`/areas/${area?.id}`}>
                     Ver Outros Serviços da Área
                   </Link>
                 </Button>

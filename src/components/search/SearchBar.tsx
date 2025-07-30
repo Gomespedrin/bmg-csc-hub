@@ -56,72 +56,95 @@ export function SearchBar({
   const generateSuggestions = (): SearchSuggestion[] => {
     const allSuggestions: SearchSuggestion[] = [];
 
-    // Add services
-    const servicos = (servicosData as any)?.services || [];
-    if (servicos.length > 0) {
-      servicos.forEach((servico: any) => {
-        allSuggestions.push({
-          id: servico.id,
-          type: "produto",
-          title: servico.produto,
-          subtitle: `${servico.subprocesso.nome} > ${servico.subprocesso.processo.nome} > ${servico.subprocesso.processo.area.nome}`,
-          path: `/servicos/${servico.id}`
+    try {
+      // Add services
+      const servicos = (servicosData as any)?.services || [];
+      if (servicos.length > 0) {
+        servicos.forEach((servico: any) => {
+          // Verificar se o serviço tem a estrutura esperada
+          if (servico && servico.subprocesso && servico.subprocesso.processo && servico.subprocesso.processo.area) {
+            allSuggestions.push({
+              id: servico.id,
+              type: "produto",
+              title: servico.produto,
+              subtitle: `${servico.subprocesso.nome} > ${servico.subprocesso.processo.nome} > ${servico.subprocesso.processo.area.nome}`,
+              path: `/servicos/${servico.id}`
+            });
+          }
         });
-      });
-    }
+      }
 
-    // Add areas
-    if (areas) {
-      areas.forEach(area => {
-        allSuggestions.push({
-          id: area.id,
-          type: "area",
-          title: area.nome,
-          subtitle: `${area.processos?.length || 0} processos disponíveis`,
-          path: `/areas/${area.id}`
+      // Add areas
+      if (areas && Array.isArray(areas)) {
+        areas.forEach(area => {
+          if (area && area.id && area.nome) {
+            allSuggestions.push({
+              id: area.id,
+              type: "area",
+              title: area.nome,
+              subtitle: `${area.processos?.length || 0} processos disponíveis`,
+              path: `/areas/${area.id}`
+            });
+          }
         });
-      });
-    }
+      }
 
-    // Add processes from areas
-    if (areas) {
-      areas.forEach(area => {
-        area.processos?.forEach(processo => {
-          allSuggestions.push({
-            id: processo.id,
-            type: "processo",
-            title: processo.nome,
-            subtitle: area.nome,
-            path: `/areas/${area.id}/processos/${processo.id}`
-          });
+      // Add processes from areas
+      if (areas && Array.isArray(areas)) {
+        areas.forEach(area => {
+          if (area && area.processos && Array.isArray(area.processos)) {
+            area.processos.forEach(processo => {
+              if (processo && processo.id && processo.nome) {
+                allSuggestions.push({
+                  id: processo.id,
+                  type: "processo",
+                  title: processo.nome,
+                  subtitle: area.nome,
+                  path: `/areas/${area.id}/processos/${processo.id}`
+                });
+              }
+            });
+          }
         });
-      });
-    }
+      }
 
-    // Add subprocesses from services
-    if (servicos.length > 0) {
-      const uniqueSubprocesses = new Map();
-      servicos.forEach((servico: any) => {
-        const key = servico.subprocesso.id;
-        if (!uniqueSubprocesses.has(key)) {
-          uniqueSubprocesses.set(key, {
-            id: servico.subprocesso.id,
-            type: "subprocesso" as const,
-            title: servico.subprocesso.nome,
-            subtitle: `${servico.subprocesso.processo.nome} > ${servico.subprocesso.processo.area.nome}`,
-            path: `/processos/${servico.subprocesso.processo.id}/subprocessos/${servico.subprocesso.id}`
-          });
-        }
-      });
-      uniqueSubprocesses.forEach(subprocesso => {
-        allSuggestions.push(subprocesso);
-      });
+      // Add subprocesses from services
+      if (servicos.length > 0) {
+        const uniqueSubprocesses = new Map();
+        servicos.forEach((servico: any) => {
+          // Verificar se o serviço tem a estrutura esperada
+          if (servico && servico.subprocesso && servico.subprocesso.processo && servico.subprocesso.processo.area) {
+            const key = servico.subprocesso.id;
+            if (!uniqueSubprocesses.has(key)) {
+              uniqueSubprocesses.set(key, {
+                id: servico.subprocesso.id,
+                type: "subprocesso" as const,
+                title: servico.subprocesso.nome,
+                subtitle: `${servico.subprocesso.processo.nome} > ${servico.subprocesso.processo.area.nome}`,
+                path: `/processos/${servico.subprocesso.processo.id}/subprocessos/${servico.subprocesso.id}`
+              });
+            }
+          }
+        });
+        uniqueSubprocesses.forEach(subprocesso => {
+          allSuggestions.push(subprocesso);
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao gerar sugestões de busca:', error);
     }
 
     return allSuggestions;
   };
 
   useEffect(() => {
+    console.log("🔍 SearchBar useEffect triggered:", { 
+      debouncedValue, 
+      showSuggestions, 
+      servicosDataLength: servicosData?.services?.length || 0,
+      areasLength: areas?.length || 0
+    });
+
     if (debouncedValue.length >= 2) {
       const allSuggestions = generateSuggestions();
       const searchTerm = debouncedValue.toLowerCase();

@@ -53,10 +53,51 @@ export const useAreas = () => {
             .eq('ativo', true)
             .order('nome');
 
+          // Buscar subprocessos para cada processo
+          const processosCompletos = await Promise.all(
+            (processos || []).map(async (processo) => {
+              const { data: subprocessos } = await supabase
+                .from('subprocessos')
+                .select('id, nome, descricao')
+                .eq('processo_id', processo.id)
+                .eq('ativo', true)
+                .order('nome');
+
+              // Buscar serviços para cada subprocesso
+              const subprocessosCompletos = await Promise.all(
+                (subprocessos || []).map(async (subprocesso) => {
+                  const { data: servicos } = await supabase
+                    .from('servicos')
+                    .select('id, produto, status')
+                    .eq('subprocesso_id', subprocesso.id)
+                    .eq('ativo', true)
+                    .eq('status', 'ativo');
+
+                  return {
+                    ...subprocesso,
+                    servicos: servicos || []
+                  };
+                })
+              );
+
+              return {
+                ...processo,
+                subprocessos: subprocessosCompletos
+              };
+            })
+          );
+
+          // Calcular quantidade total de serviços para esta área
+          const quantidadeServicos = processosCompletos.reduce((total, processo) => {
+            return total + processo.subprocessos.reduce((subTotal, subprocesso) => {
+              return subTotal + (subprocesso.servicos?.length || 0);
+            }, 0);
+          }, 0);
+
           return {
             ...area,
-            processos: processos || [],
-            quantidadeServicos: 0 // Será calculado separadamente se necessário
+            processos: processosCompletos,
+            quantidadeServicos
           };
         })
       );

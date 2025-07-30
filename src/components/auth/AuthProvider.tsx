@@ -45,14 +45,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const loadProfile = async (userId: string) => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
-    
-    if (!error && data) {
-      setProfile(data);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+      
+      if (!error && data) {
+        setProfile(data);
+      } else if (error && error.code === 'PGRST116') {
+        // Perfil não encontrado - isso é normal para usuários novos
+        console.log('Perfil não encontrado para o usuário:', userId);
+        setProfile(null);
+      } else if (error) {
+        console.error('Erro ao carregar perfil:', error);
+        setProfile(null);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar perfil:', error);
+      setProfile(null);
     }
   };
 

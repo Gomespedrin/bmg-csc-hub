@@ -13,9 +13,11 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { LoginDialog } from "@/components/auth/LoginDialog";
+import { useIsAdmin } from "@/hooks/useAdmin";
 
 export function Header() {
   const { user, profile, signOut } = useAuth();
+  const { data: isAdmin } = useIsAdmin();
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
 
   const handleSignOut = async () => {
@@ -107,26 +109,34 @@ export function Header() {
                   </div>
                 </div>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                  <User className="mr-2 h-4 w-4" />
-                  <span>Perfil</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Settings className="mr-2 h-4 w-4" />
-                  <span>Configurações</span>
-                </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link to="/admin/sugestoes">
-                    <Shield className="mr-2 h-4 w-4" />
-                    <span>Admin - Sugestões</span>
+                  <Link to="/perfil">
+                    <User className="mr-2 h-4 w-4" />
+                    <span>Perfil</span>
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link to="/admin/catalogo">
-                    <Shield className="mr-2 h-4 w-4" />
-                    <span>Admin - Catálogo</span>
+                  <Link to="/configuracoes">
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>Configurações</span>
                   </Link>
                 </DropdownMenuItem>
+                {isAdmin && (
+                  <>
+                    <DropdownMenuItem asChild>
+                      <Link to="/admin/sugestoes">
+                        <Shield className="mr-2 h-4 w-4" />
+                        <span>Admin - Sugestões</span>
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link to="/admin/catalogo">
+                        <Shield className="mr-2 h-4 w-4" />
+                        <span>Admin - Catálogo</span>
+                      </Link>
+                    </DropdownMenuItem>
+                  </>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="text-destructive" onClick={handleSignOut}>
                   <LogOut className="mr-2 h-4 w-4" />
