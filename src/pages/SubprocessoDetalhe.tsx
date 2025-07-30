@@ -183,7 +183,7 @@ export default function SubprocessoDetalhe() {
           </div>
         </div>
 
-        {/* Services Grid */}
+        {/* Services - Layout em Lista */}
         {formattedServicos.length === 0 ? (
           <div className="text-center py-12">
             <FolderOpen className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
@@ -193,9 +193,67 @@ export default function SubprocessoDetalhe() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="space-y-4">
             {formattedServicos.map((servico) => (
-              <ServiceCard key={servico.id} service={servico} />
+              <Card key={servico.id} className="hover:shadow-md transition-shadow">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                        <Package className="h-6 w-6 text-primary" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-xl font-semibold mb-2">{servico.produto}</h3>
+                        <p className="text-sm text-muted-foreground mb-3">
+                          <span className="font-medium text-secondary">{servico.area}</span>
+                          {" > "}
+                          <span className="text-muted-foreground">{servico.processo}</span>
+                          {" > "}
+                          <span className="text-muted-foreground">{servico.subprocesso}</span>
+                        </p>
+                        <div className="flex items-center space-x-6">
+                          <div className="flex items-center space-x-2">
+                            <Clock className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm text-muted-foreground">
+                              Tempo médio: <span className="font-medium">{servico.tempoMedio}</span>
+                            </span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Target className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm text-muted-foreground">
+                              SLA: <span className="font-medium">{servico.sla}</span>
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center space-x-3">
+                      <Badge 
+                        variant={servico.status === "Ativo" ? "default" : "secondary"}
+                        className={servico.status === "Ativo" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}
+                      >
+                        {servico.status}
+                      </Badge>
+                      <Badge 
+                        variant="outline" 
+                        className={`${servico.demandaRotina === "Demanda" 
+                          ? "border-warning text-warning" 
+                          : "border-accent text-accent"
+                        }`}
+                      >
+                        {servico.demandaRotina}
+                      </Badge>
+                      <Button asChild variant="outline" size="sm">
+                        <Link to={createServicoUrl(servico.produto, servico.id)}>
+                          Ver detalhes
+                          <ArrowLeft className="ml-2 h-3 w-3 rotate-180" />
+                        </Link>
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             ))}
           </div>
         )}
