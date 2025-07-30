@@ -129,23 +129,10 @@ export function useServicos(filters: FilterOptions = {}) {
       }
 
       if (busca) {
-        // Busca mais robusta sem caracteres especiais problemáticos
-        const searchTerms = busca.trim().split(' ').filter(term => term.length > 0);
-        
-        if (searchTerms.length > 0) {
-          const searchConditions = searchTerms.map(term => {
-            const sanitizedTerm = term.replace(/[\[\](){}^$+*?.|\\]/g, '\\$&');
-            return `
-              produto.ilike.%${sanitizedTerm}%,
-              subprocesso.nome.ilike.%${sanitizedTerm}%,
-              subprocesso.processo.nome.ilike.%${sanitizedTerm}%,
-              subprocesso.processo.area.nome.ilike.%${sanitizedTerm}%,
-              o_que_e.ilike.%${sanitizedTerm}%,
-              observacoes.ilike.%${sanitizedTerm}%
-            `;
-          }).join(',');
-          
-          query = query.or(searchConditions);
+        // Busca simplificada - buscar apenas no produto por enquanto
+        const sanitizedBusca = busca.trim().replace(/[\[\](){}^$+*?.|\\]/g, '\\$&');
+        if (sanitizedBusca) {
+          query = query.ilike("produto", `%${sanitizedBusca}%`);
         }
       }
 

@@ -10,11 +10,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ArrowLeft, Plus, Edit, FileText, CheckCircle, AlertCircle } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ArrowLeft, Plus, Edit, FileText, CheckCircle, AlertCircle, Info } from "lucide-react";
 import { useAreas, useAreaById } from "@/hooks/useAreas";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useCreateSugestao } from "@/hooks/useSugestoes";
-import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 type SugestaoMode = "criacao" | "edicao";
 type SugestaoScope = "area" | "processo" | "subprocesso" | "servico";
@@ -35,6 +36,7 @@ interface SugestaoForm {
 export default function NovaSugestao() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { toast } = useToast();
   const { data: areas } = useAreas();
   const createSugestao = useCreateSugestao();
   
@@ -89,7 +91,11 @@ export default function NovaSugestao() {
     e.preventDefault();
     
     if (!user) {
-      alert("Você precisa estar logado para enviar uma sugestão.");
+      toast({
+        title: "Erro",
+        description: "Você precisa estar logado para enviar uma sugestão.",
+        variant: "destructive"
+      });
       return;
     }
 
@@ -100,6 +106,7 @@ export default function NovaSugestao() {
     try {
       const sugestaoData = {
         tipo: form.modo === "criacao" ? "novo" : "edicao",
+        modo: form.modo, // Adicionar o campo modo
         dados_sugeridos: {
           modo: form.modo,
           escopo: form.escopo,
@@ -111,6 +118,7 @@ export default function NovaSugestao() {
           descricao: form.descricao,
           dados_atuais: form.dadosAtuais
         },
+        dados_atuais: form.dadosAtuais || {}, // Adicionar dados_atuais no nível raiz
         justificativa: form.justificativa
       };
 
@@ -118,10 +126,20 @@ export default function NovaSugestao() {
 
       await createSugestao.mutateAsync(sugestaoData);
       console.log("Sugestão enviada com sucesso!");
+      
+      toast({
+        title: "Sugestão enviada",
+        description: "Sua sugestão foi enviada com sucesso e será analisada pelos administradores.",
+      });
+      
       setShowSuccessModal(true);
     } catch (error) {
       console.error("Erro ao enviar sugestão:", error);
-      alert("Erro ao enviar sugestão. Tente novamente.");
+      toast({
+        title: "Erro",
+        description: "Erro ao enviar sugestão. Tente novamente.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -208,7 +226,7 @@ export default function NovaSugestao() {
         // Para criar subprocesso, precisa selecionar área e processo
         hasRequiredHierarchy = !!form.areaId && !!form.processoId;
       } else if (form.escopo === "servico") {
-        // Para criar serviço, precisa selecionar área, processo e subprocesso
+        // Para criar serviço, precisa selecionar área, processo e subprocesso (NÃO serviço!)
         hasRequiredHierarchy = !!form.areaId && !!form.processoId && !!form.subprocessoId;
       }
       
@@ -224,8 +242,19 @@ export default function NovaSugestao() {
       });
       return isValid;
     } else {
-      // Para edição, apenas o item-alvo é obrigatório
-      const hasTargetItem = form.areaId || form.processoId || form.subprocessoId || form.servicoId;
+      // Para edição, verificar se o item-alvo foi selecionado baseado no escopo
+      let hasTargetItem = false;
+      
+      if (form.escopo === "area") {
+        hasTargetItem = !!form.areaId;
+      } else if (form.escopo === "processo") {
+        hasTargetItem = !!form.processoId;
+      } else if (form.escopo === "subprocesso") {
+        hasTargetItem = !!form.subprocessoId;
+      } else if (form.escopo === "servico") {
+        hasTargetItem = !!form.servicoId;
+      }
+      
       const isValid = hasRequiredFields && hasTargetItem;
       console.log("isFormValid - Edição:", { hasRequiredFields, hasTargetItem, isValid });
       return isValid;
@@ -247,10 +276,10 @@ export default function NovaSugestao() {
           </Button>
           
           <div className="text-center">
-            <h1 className="text-3xl font-bold text-foreground mb-4">
+            <h1 className="text-3xl font-bold text-black mb-4">
               {form.modo === "criacao" ? "Nova Sugestão" : "Editar Item"}
             </h1>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            <p className="text-lg text-gray-700 max-w-2xl mx-auto">
               {form.modo === "criacao" 
                 ? "Sugira a criação de novos itens no catálogo de serviços."
                 : "Sugira melhorias para itens existentes no catálogo."
@@ -262,61 +291,75 @@ export default function NovaSugestao() {
         <div className="max-w-4xl mx-auto">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
+              <CardTitle className="flex items-center space-x-2 text-black">
                 {form.modo === "criacao" ? <Plus className="h-5 w-5" /> : <Edit className="h-5 w-5" />}
                 <span>Formulário de Sugestão</span>
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-gray-600">
                 Preencha os campos abaixo para enviar sua sugestão
               </CardDescription>
             </CardHeader>
             
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Modo e Escopo */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label>Modo</Label>
-                    <Select 
-                      value={form.modo} 
-                      onValueChange={(value: SugestaoMode) => setForm(prev => ({ ...prev, modo: value }))}
+                {/* Tipo de Sugestão */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold flex items-center gap-2 text-black">
+                    <Info className="h-5 w-5" />
+                    Tipo de Sugestão
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Button
+                      type="button"
+                      variant={form.modo === "criacao" ? "default" : "outline"}
+                      onClick={() => setForm(prev => ({ ...prev, modo: "criacao" }))}
+                      className="h-auto p-4 flex flex-col items-center space-y-2"
                     >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="criacao">
-                          <div className="flex items-center space-x-2">
-                            <Plus className="h-4 w-4" />
-                            <span>Criação</span>
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="edicao">
-                          <div className="flex items-center space-x-2">
-                            <Edit className="h-4 w-4" />
-                            <span>Edição</span>
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
+                      <Plus className="h-6 w-6" />
+                      <span className="text-black">Novo Item</span>
+                      <span className="text-xs text-gray-600">Sugerir criação de novo item</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={form.modo === "edicao" ? "default" : "outline"}
+                      onClick={() => setForm(prev => ({ ...prev, modo: "edicao" }))}
+                      className="h-auto p-4 flex flex-col items-center space-y-2"
+                    >
+                      <Edit className="h-6 w-6" />
+                      <span className="text-black">Edição</span>
+                      <span className="text-xs text-gray-600">Sugerir melhorias em item existente</span>
+                    </Button>
                   </div>
+                </div>
 
-                  <div className="space-y-2">
-                    <Label>Escopo</Label>
-                    <Select 
-                      value={form.escopo} 
-                      onValueChange={handleEscopoChange}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="area">Área</SelectItem>
-                        <SelectItem value="processo">Processo</SelectItem>
-                        <SelectItem value="subprocesso">Subprocesso</SelectItem>
-                        <SelectItem value="servico">Serviço</SelectItem>
-                      </SelectContent>
-                    </Select>
+                <Separator />
+
+                {/* Escopo */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold flex items-center gap-2 text-black">
+                    <FileText className="h-5 w-5" />
+                    Escopo da Sugestão
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label className="text-black">Escopo</Label>
+                      <Select 
+                        value={form.escopo} 
+                        onValueChange={handleEscopoChange}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="area">Área</SelectItem>
+                          <SelectItem value="processo">Processo</SelectItem>
+                          <SelectItem value="subprocesso">Subprocesso</SelectItem>
+                          <SelectItem value="servico">Serviço</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </div>
 
@@ -324,97 +367,288 @@ export default function NovaSugestao() {
 
                 {/* Hierarquia */}
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Hierarquia</h3>
+                  <h3 className="text-lg font-semibold text-black">Hierarquia</h3>
                   
-                  {/* Área */}
-                  {form.escopo !== "area" && (
-                    <div className="space-y-2">
-                      <Label>Área {form.modo === "criacao" && "*"}</Label>
-                      <Select 
-                        value={form.areaId || ""} 
-                        onValueChange={(value) => handleItemSelect(value, "area")}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione uma área" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {areas?.map(area => (
-                            <SelectItem key={area.id} value={area.id}>
-                              {area.nome}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  {/* Para criação: mostrar campos baseados no escopo */}
+                  {form.modo === "criacao" && (
+                    <>
+                      {form.escopo !== "area" && (
+                        <div className="space-y-2">
+                          <Label className="text-black">Área *</Label>
+                          <Select 
+                            value={form.areaId || ""} 
+                            onValueChange={(value) => handleItemSelect(value, "area")}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione uma área" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {areas?.map(area => (
+                                <SelectItem key={area.id} value={area.id}>
+                                  {area.nome}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+
+                      {form.escopo !== "processo" && form.escopo !== "area" && (
+                        <div className="space-y-2">
+                          <Label className="text-black">Processo *</Label>
+                          <Select 
+                            value={form.processoId || ""} 
+                            onValueChange={(value) => handleItemSelect(value, "processo")}
+                            disabled={!form.areaId}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione um processo" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {processos.map(processo => (
+                                <SelectItem key={processo.id} value={processo.id}>
+                                  {processo.nome}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+
+                      {form.escopo !== "subprocesso" && form.escopo !== "processo" && form.escopo !== "area" && (
+                        <div className="space-y-2">
+                          <Label className="text-black">Subprocesso *</Label>
+                          <Select 
+                            value={form.subprocessoId || ""} 
+                            onValueChange={(value) => handleItemSelect(value, "subprocesso")}
+                            disabled={!form.processoId}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione um subprocesso" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {subprocessos.map(subprocesso => (
+                                <SelectItem key={subprocesso.id} value={subprocesso.id}>
+                                  {subprocesso.nome}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+
+                                             {/* Para criação de serviço, NÃO mostrar campo de seleção de serviço */}
+                       {/* O serviço será criado, não selecionado */}
+                    </>
                   )}
 
-                  {/* Processo */}
-                  {form.escopo !== "area" && (
-                    <div className="space-y-2">
-                      <Label>Processo {form.modo === "criacao" && form.escopo !== "processo" && "*"}</Label>
-                      <Select 
-                        value={form.processoId || ""} 
-                        onValueChange={(value) => handleItemSelect(value, "processo")}
-                        disabled={!form.areaId || (form.modo === "criacao" && form.escopo === "processo")}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione um processo" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {processos.map(processo => (
-                            <SelectItem key={processo.id} value={processo.id}>
-                              {processo.nome}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
+                  {/* Para edição: mostrar apenas o campo do escopo selecionado */}
+                  {form.modo === "edicao" && (
+                    <>
+                      {form.escopo === "area" && (
+                        <div className="space-y-2">
+                          <Label className="text-black">Área a Editar *</Label>
+                          <Select 
+                            value={form.areaId || ""} 
+                            onValueChange={(value) => handleItemSelect(value, "area")}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione uma área" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {areas?.map(area => (
+                                <SelectItem key={area.id} value={area.id}>
+                                  {area.nome}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
 
-                  {/* Subprocesso */}
-                  {form.escopo !== "area" && form.escopo !== "processo" && (
-                    <div className="space-y-2">
-                      <Label>Subprocesso {form.modo === "criacao" && form.escopo !== "subprocesso" && "*"}</Label>
-                      <Select 
-                        value={form.subprocessoId || ""} 
-                        onValueChange={(value) => handleItemSelect(value, "subprocesso")}
-                        disabled={!form.processoId || (form.modo === "criacao" && form.escopo === "subprocesso")}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione um subprocesso" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {subprocessos.map(subprocesso => (
-                            <SelectItem key={subprocesso.id} value={subprocesso.id}>
-                              {subprocesso.nome}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
+                      {form.escopo === "processo" && (
+                        <>
+                          <div className="space-y-2">
+                            <Label className="text-black">Área *</Label>
+                            <Select 
+                              value={form.areaId || ""} 
+                              onValueChange={(value) => handleItemSelect(value, "area")}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione uma área" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {areas?.map(area => (
+                                  <SelectItem key={area.id} value={area.id}>
+                                    {area.nome}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-black">Processo a Editar *</Label>
+                            <Select 
+                              value={form.processoId || ""} 
+                              onValueChange={(value) => handleItemSelect(value, "processo")}
+                              disabled={!form.areaId}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione um processo" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {processos.map(processo => (
+                                  <SelectItem key={processo.id} value={processo.id}>
+                                    {processo.nome}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </>
+                      )}
 
-                  {/* Serviço */}
-                  {form.escopo === "servico" && (
-                    <div className="space-y-2">
-                      <Label>Serviço {form.modo === "criacao" && "*"}</Label>
-                      <Select 
-                        value={form.servicoId || ""} 
-                        onValueChange={(value) => handleItemSelect(value, "servico")}
-                        disabled={!form.subprocessoId || (form.modo === "criacao" && form.escopo === "servico")}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione um serviço" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {servicos.map(servico => (
-                            <SelectItem key={servico.id} value={servico.id}>
-                              {servico.produto}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                      {form.escopo === "subprocesso" && (
+                        <>
+                          <div className="space-y-2">
+                            <Label className="text-black">Área *</Label>
+                            <Select 
+                              value={form.areaId || ""} 
+                              onValueChange={(value) => handleItemSelect(value, "area")}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione uma área" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {areas?.map(area => (
+                                  <SelectItem key={area.id} value={area.id}>
+                                    {area.nome}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-black">Processo *</Label>
+                            <Select 
+                              value={form.processoId || ""} 
+                              onValueChange={(value) => handleItemSelect(value, "processo")}
+                              disabled={!form.areaId}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione um processo" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {processos.map(processo => (
+                                  <SelectItem key={processo.id} value={processo.id}>
+                                    {processo.nome}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-black">Subprocesso a Editar *</Label>
+                            <Select 
+                              value={form.subprocessoId || ""} 
+                              onValueChange={(value) => handleItemSelect(value, "subprocesso")}
+                              disabled={!form.processoId}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione um subprocesso" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {subprocessos.map(subprocesso => (
+                                  <SelectItem key={subprocesso.id} value={subprocesso.id}>
+                                    {subprocesso.nome}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </>
+                      )}
+
+                      {form.escopo === "servico" && (
+                        <>
+                          <div className="space-y-2">
+                            <Label className="text-black">Área *</Label>
+                            <Select 
+                              value={form.areaId || ""} 
+                              onValueChange={(value) => handleItemSelect(value, "area")}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione uma área" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {areas?.map(area => (
+                                  <SelectItem key={area.id} value={area.id}>
+                                    {area.nome}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-black">Processo *</Label>
+                            <Select 
+                              value={form.processoId || ""} 
+                              onValueChange={(value) => handleItemSelect(value, "processo")}
+                              disabled={!form.areaId}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione um processo" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {processos.map(processo => (
+                                  <SelectItem key={processo.id} value={processo.id}>
+                                    {processo.nome}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-black">Subprocesso *</Label>
+                            <Select 
+                              value={form.subprocessoId || ""} 
+                              onValueChange={(value) => handleItemSelect(value, "subprocesso")}
+                              disabled={!form.processoId}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione um subprocesso" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {subprocessos.map(subprocesso => (
+                                  <SelectItem key={subprocesso.id} value={subprocesso.id}>
+                                    {subprocesso.nome}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-black">Serviço a Editar *</Label>
+                            <Select 
+                              value={form.servicoId || ""} 
+                              onValueChange={(value) => handleItemSelect(value, "servico")}
+                              disabled={!form.subprocessoId}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione um serviço" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {servicos.map(servico => (
+                                  <SelectItem key={servico.id} value={servico.id}>
+                                    {servico.produto}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </>
+                      )}
+                    </>
                   )}
                 </div>
 
@@ -422,42 +656,42 @@ export default function NovaSugestao() {
 
                 {/* Dados do Item */}
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Dados do {getEscopoLabel(form.escopo)}</h3>
+                  <h3 className="text-lg font-semibold text-black">Dados do {getEscopoLabel(form.escopo)}</h3>
                   
                   <div className="space-y-2">
-                    <Label>Nome *</Label>
+                    <Label className="text-black">Nome *</Label>
                     <Input
                       value={form.nome}
                       onChange={(e) => setForm(prev => ({ ...prev, nome: e.target.value }))}
                       placeholder={`Nome do ${getEscopoLabel(form.escopo).toLowerCase()}`}
+                      className="text-black"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Descrição *</Label>
+                    <Label className="text-black">Descrição *</Label>
                     <Textarea
                       value={form.descricao}
                       onChange={(e) => setForm(prev => ({ ...prev, descricao: e.target.value }))}
                       placeholder={`Descrição do ${getEscopoLabel(form.escopo).toLowerCase()}`}
                       rows={3}
+                      className="text-black"
                     />
                   </div>
 
                   {/* Dados Atuais (apenas para edição) */}
                   {form.modo === "edicao" && form.dadosAtuais && (
                     <div className="space-y-2">
-                      <Label>Dados Atuais</Label>
+                      <Label className="text-black">Dados Atuais</Label>
                       <Card className="bg-muted/50">
                         <CardContent className="p-4">
                           <div className="space-y-2">
                             <div>
-                              <span className="font-medium">Nome:</span> {form.dadosAtuais.nome}
+                              <span className="font-medium text-black">Nome:</span> {form.dadosAtuais.nome}
                             </div>
-                            {form.dadosAtuais.descricao && (
-                              <div>
-                                <span className="font-medium">Descrição:</span> {form.dadosAtuais.descricao}
-                              </div>
-                            )}
+                            <div>
+                              <span className="font-medium text-black">Descrição:</span> {form.dadosAtuais.descricao}
+                            </div>
                           </div>
                         </CardContent>
                       </Card>
@@ -469,16 +703,17 @@ export default function NovaSugestao() {
 
                 {/* Justificativa */}
                 <div className="space-y-2">
-                  <Label>Justificativa *</Label>
+                  <Label className="text-black">Justificativa *</Label>
                   <Textarea
                     value={form.justificativa}
                     onChange={(e) => setForm(prev => ({ ...prev, justificativa: e.target.value }))}
-                    placeholder="Explique o motivo da sua sugestão..."
+                    placeholder="Explique por que esta sugestão é importante..."
                     rows={4}
+                    className="text-black"
                   />
                 </div>
 
-                {/* Submit */}
+                {/* Botões */}
                 <div className="flex justify-end space-x-4">
                   <Button 
                     type="button" 
@@ -506,9 +741,9 @@ export default function NovaSugestao() {
             <DialogHeader>
               <DialogTitle className="flex items-center space-x-2">
                 <CheckCircle className="h-5 w-5 text-green-500" />
-                <span>Sugestão Enviada!</span>
+                <span className="text-black">Sugestão Enviada!</span>
               </DialogTitle>
-              <DialogDescription>
+              <DialogDescription className="text-gray-600">
                 Sua sugestão foi enviada com sucesso e está sendo analisada pela equipe.
               </DialogDescription>
             </DialogHeader>

@@ -59,6 +59,12 @@ const Index = () => {
             <SearchBar 
               placeholder="Buscar serviços, processos, áreas..."
               className="w-full"
+              onSearchChange={(value) => {
+                if (value.trim()) {
+                  // Navegar para a página de serviços com o termo de busca
+                  window.location.href = `/servicos?busca=${encodeURIComponent(value.trim())}`;
+                }
+              }}
             />
           </div>
 

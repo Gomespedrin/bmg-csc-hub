@@ -43,14 +43,17 @@ export function SearchBar({
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedValue(value);
-      // Notificar componente pai sobre mudança
-      if (onSearchChange) {
-        onSearchChange(value);
-      }
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [value, onSearchChange]);
+  }, [value]);
+
+  // Notificar componente pai sobre mudança (apenas quando necessário)
+  useEffect(() => {
+    if (onSearchChange && debouncedValue !== value) {
+      onSearchChange(debouncedValue);
+    }
+  }, [debouncedValue, onSearchChange]);
 
   // Generate suggestions from real data
   const generateSuggestions = (): SearchSuggestion[] => {
@@ -138,13 +141,6 @@ export function SearchBar({
   };
 
   useEffect(() => {
-    console.log("🔍 SearchBar useEffect triggered:", { 
-      debouncedValue, 
-      showSuggestions, 
-      servicosDataLength: servicosData?.services?.length || 0,
-      areasLength: areas?.length || 0
-    });
-
     if (debouncedValue.length >= 2) {
       const allSuggestions = generateSuggestions();
       const searchTerm = debouncedValue.toLowerCase();
@@ -157,14 +153,6 @@ export function SearchBar({
       
       setSuggestions(filtered.slice(0, 8)); // Limit to 8 suggestions
       setOpen(showSuggestions && filtered.length > 0);
-      
-      console.log("🔍 Search suggestions:", { 
-        debouncedValue, 
-        searchTerm,
-        totalSuggestions: allSuggestions.length, 
-        filteredSuggestions: filtered.length,
-        suggestions: filtered.slice(0, 3) // Log first 3 for debugging
-      });
     } else {
       setSuggestions([]);
       setOpen(false);

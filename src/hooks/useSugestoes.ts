@@ -45,6 +45,8 @@ export const useCreateSugestao = () => {
       dados_sugeridos: any;
       justificativa?: string;
       servico_id?: string;
+      modo?: string;
+      dados_atuais?: any;
     }) => {
       console.log("useCreateSugestao - Iniciando mutation");
       const { data: { user } } = await supabase.auth.getUser();
@@ -57,6 +59,8 @@ export const useCreateSugestao = () => {
         .from('sugestoes')
         .insert({
           ...sugestao,
+          modo: sugestao.modo || 'criacao', // Garantir que modo não seja null
+          dados_atuais: sugestao.dados_atuais || {}, // Garantir que dados_atuais não seja null
           criado_por: user.id,
         })
         .select()
