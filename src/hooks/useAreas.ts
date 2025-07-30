@@ -10,36 +10,58 @@ export interface Area {
   processos?: any[];
 }
 
+export interface AreaCompleta extends Area {
+  processos: {
+    id: string;
+    nome: string;
+    descricao?: string;
+    subprocessos: {
+      id: string;
+      nome: string;
+      descricao?: string;
+      servicos: {
+        id: string;
+        produto: string;
+        status: string;
+        tempo_medio?: number;
+        sla?: number;
+        demanda_rotina?: string;
+      }[];
+    }[];
+  }[];
+}
+
 export const useAreas = () => {
   return useQuery({
     queryKey: ['areas'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('areas')
-        .select(`
-          *,
-          processos(
-            id,
-            nome,
-            subprocessos(
-              id,
-              nome,
-              servicos(count)
-            )
-          )
-        `)
-        .eq('ativo', true);
+        .select('*')
+        .eq('ativo', true)
+        .order('nome');
       
       if (error) throw error;
       
-      return data.map(area => ({
-        ...area,
-        quantidadeServicos: area.processos?.reduce((total: number, processo: any) => {
-          return total + (processo.subprocessos?.reduce((subTotal: number, subprocesso: any) => {
-            return subTotal + (subprocesso.servicos?.[0]?.count || 0);
-          }, 0) || 0);
-        }, 0) || 0
-      })) as Area[];
+      // Buscar processos para cada área
+      const areasWithProcessos = await Promise.all(
+        data.map(async (area) => {
+          const { data: processos } = await supabase
+            .from('processos')
+            .select('id, nome, descricao')
+            .eq('area_id', area.id)
+            .eq('ativo', true)
+            .order('nome');
+
+          return {
+            ...area,
+            processos: processos || [],
+            quantidadeServicos: 0 // Será calculado separadamente se necessário
+          };
+        })
+      );
+      
+      return areasWithProcessos as AreaCompleta[];
     },
   });
 };
@@ -48,24 +70,126 @@ export const useAreaById = (id: string) => {
   return useQuery({
     queryKey: ['area', id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Buscar área
+      const { data: area, error: areaError } = await supabase
         .from('areas')
-        .select(`
-          *,
-          processos(
-            *,
-            subprocessos(
-              *,
-              servicos(*)
-            )
-          )
-        `)
+        .select('*')
         .eq('id', id)
+        .eq('ativo', true)
         .single();
       
-      if (error) throw error;
-      return data as Area;
+      if (areaError) throw areaError;
+
+      // Buscar processos da área
+      const { data: processos } = await supabase
+        .from('processos')
+        .select('id, nome, descricao')
+        .eq('area_id', id)
+        .eq('ativo', true)
+        .order('nome');
+
+      // Buscar subprocessos e serviços para cada processo
+      const processosCompletos = await Promise.all(
+        (processos || []).map(async (processo) => {
+          const { data: subprocessos } = await supabase
+            .from('subprocessos')
+            .select('id, nome, descricao')
+            .eq('processo_id', processo.id)
+            .eq('ativo', true)
+            .order('nome');
+
+          // Buscar serviços para cada subprocesso
+          const subprocessosCompletos = await Promise.all(
+            (subprocessos || []).map(async (subprocesso) => {
+              const { data: servicos } = await supabase
+                .from('servicos')
+                .select('id, produto, status, tempo_medio, sla, demanda_rotina, o_que_e, quem_pode_utilizar, requisitos_operacionais, observacoes')
+                .eq('subprocesso_id', subprocesso.id)
+                .eq('ativo', true)
+                .eq('status', 'ativo')
+                .order('produto');
+
+              return {
+                ...subprocesso,
+                servicos: servicos || []
+              };
+            })
+          );
+
+          return {
+            ...processo,
+            subprocessos: subprocessosCompletos
+          };
+        })
+      );
+
+      // Calcular quantidade total de serviços
+      const quantidadeServicos = processosCompletos.reduce((total, processo) => {
+        return total + processo.subprocessos.reduce((subTotal, subprocesso) => {
+          return subTotal + (subprocesso.servicos?.length || 0);
+        }, 0);
+      }, 0);
+      
+      return {
+        ...area,
+        processos: processosCompletos,
+        quantidadeServicos
+      } as AreaCompleta;
     },
     enabled: !!id,
+  });
+};
+
+export const useProcessos = (areaId?: string) => {
+  return useQuery({
+    queryKey: ['processos', areaId],
+    queryFn: async () => {
+      let query = supabase
+        .from('processos')
+        .select(`
+          id,
+          nome,
+          descricao,
+          area:areas(id, nome)
+        `)
+        .eq('ativo', true);
+
+      if (areaId) {
+        query = query.eq('area_id', areaId);
+      }
+
+      const { data, error } = await query.order('nome');
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !areaId || !!areaId,
+  });
+};
+
+export const useSubprocessos = (processoId?: string) => {
+  return useQuery({
+    queryKey: ['subprocessos', processoId],
+    queryFn: async () => {
+      let query = supabase
+        .from('subprocessos')
+        .select(`
+          id,
+          nome,
+          descricao,
+          processo:processos(id, nome, area:areas(id, nome))
+        `)
+        .eq('ativo', true);
+
+      if (processoId) {
+        query = query.eq('processo_id', processoId);
+      }
+
+      const { data, error } = await query.order('nome');
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !processoId || !!processoId,
   });
 };

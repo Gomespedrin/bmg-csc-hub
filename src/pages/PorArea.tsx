@@ -5,51 +5,6 @@ import { SearchBar } from "@/components/search/SearchBar";
 import { useAreas } from "@/hooks/useAreas";
 import { Building2, Users, Zap } from "lucide-react";
 
-const mockAreas = [
-  {
-    id: "rh",
-    nome: "Recursos Humanos",
-    descricao: "Gestão de pessoas, onboarding, folha de pagamento e desenvolvimento organizacional.",
-    quantidadeServicos: 23,
-    processos: ["Onboarding", "Folha de Pagamento", "Treinamento", "Avaliação de Performance"]
-  },
-  {
-    id: "ti", 
-    nome: "Tecnologia da Informação",
-    descricao: "Desenvolvimento de sistemas, infraestrutura, suporte técnico e segurança da informação.",
-    quantidadeServicos: 31,
-    processos: ["Desenvolvimento", "Infraestrutura", "Suporte", "Segurança"]
-  },
-  {
-    id: "financeiro",
-    nome: "Financeiro",
-    descricao: "Contabilidade, controladoria, planejamento financeiro e gestão de custos.",
-    quantidadeServicos: 18,
-    processos: ["Contabilidade", "Controladoria", "Planejamento", "Custos"]
-  },
-  {
-    id: "juridico",
-    nome: "Jurídico",
-    descricao: "Contratos, compliance, consultoria jurídica e gestão de riscos legais.",
-    quantidadeServicos: 15,
-    processos: ["Contratos", "Compliance", "Consultoria", "Riscos"]
-  },
-  {
-    id: "operacoes",
-    nome: "Operações",
-    descricao: "Processos operacionais, logística, qualidade e melhoria contínua.",
-    quantidadeServicos: 27,
-    processos: ["Logística", "Qualidade", "Melhoria Contínua", "Processos"]
-  },
-  {
-    id: "comercial",
-    nome: "Comercial",
-    descricao: "Vendas, marketing, relacionamento com cliente e desenvolvimento de negócios.",
-    quantidadeServicos: 19,
-    processos: ["Vendas", "Marketing", "CRM", "Desenvolvimento"]
-  }
-];
-
 export default function PorArea() {
   const [searchTerm, setSearchTerm] = useState("");
   const { data: areas, isLoading } = useAreas();

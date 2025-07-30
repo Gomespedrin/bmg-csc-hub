@@ -10,53 +10,24 @@ import { useServicos } from "@/hooks/useServicos";
 import { useAreas } from "@/hooks/useAreas";
 import heroImage from "@/assets/hero-portal-csc.jpg";
 
-const featuredServicos = [
-  {
-    id: "1",
-    produto: "Abertura de Conta PJ",
-    subprocesso: "Onboarding",
-    processo: "Gestão de Novos Clientes", 
-    area: "Recursos Humanos",
-    tempoMedio: "2 dias",
-    sla: "5 dias",
-    status: "Ativo" as const,
-    demandaRotina: "Demanda" as const
-  },
-  {
-    id: "2",
-    produto: "Deploy de Aplicação",
-    subprocesso: "CI/CD",
-    processo: "Desenvolvimento de Sistemas",
-    area: "Tecnologia da Informação",
-    tempoMedio: "30 min",
-    sla: "2 horas", 
-    status: "Ativo" as const,
-    demandaRotina: "Demanda" as const
-  }
-];
-
-const featuredAreas = [
-  {
-    id: "rh",
-    nome: "Recursos Humanos",
-    descricao: "Gestão de pessoas, onboarding, folha de pagamento e desenvolvimento organizacional.",
-    quantidadeServicos: 23,
-    processos: ["Onboarding", "Folha de Pagamento", "Treinamento"]
-  },
-  {
-    id: "ti", 
-    nome: "Tecnologia da Informação",
-    descricao: "Desenvolvimento de sistemas, infraestrutura, suporte técnico e segurança da informação.",
-    quantidadeServicos: 31,
-    processos: ["Desenvolvimento", "Infraestrutura", "Suporte"]
-  }
-];
-
 const Index = () => {
   const { data: servicos, isLoading: servicosLoading } = useServicos();
   const { data: areas, isLoading: areasLoading } = useAreas();
 
-  const featuredServicos = servicos?.slice(0, 2) || [];
+  // Convert servicos data for ServiceCard component
+  const formattedServicos = (servicos || []).map(servico => ({
+    id: servico.id,
+    produto: servico.produto,
+    subprocesso: servico.subprocesso.nome,
+    processo: servico.subprocesso.processo.nome,
+    area: servico.subprocesso.processo.area.nome,
+    tempoMedio: servico.tempo_medio ? `${Math.ceil(servico.tempo_medio / 60)} dias` : '1 dia',
+    sla: servico.sla ? `${servico.sla} horas` : '24 horas',
+    status: (servico.status === 'ativo' ? 'Ativo' : 'Inativo') as "Ativo" | "Inativo",
+    demandaRotina: (servico.demanda_rotina as "Demanda" | "Rotina") || 'Demanda'
+  }));
+
+  const featuredServicos = formattedServicos.slice(0, 2);
   const featuredAreas = areas?.slice(0, 2) || [];
   const totalServicos = servicos?.length || 0;
   const totalAreas = areas?.length || 0;
@@ -150,7 +121,7 @@ const Index = () => {
               Serviços em Destaque
             </h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Conheça alguns dos serviços mais utilizados e bem avaliados do nosso catálogo.
+              Conheça alguns dos principais serviços disponíveis no nosso catálogo.
             </p>
           </div>
 
@@ -160,23 +131,34 @@ const Index = () => {
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
                 <p className="mt-4 text-muted-foreground">Carregando serviços...</p>
               </div>
-            ) : (
+            ) : featuredServicos.length > 0 ? (
               featuredServicos.map(servico => (
-                <ServiceCard 
-                  key={servico.id} 
-                  service={{
-                    id: servico.id,
-                    produto: servico.produto,
-                    subprocesso: servico.subprocesso.nome,
-                    processo: servico.subprocesso.processo.nome,
-                    area: servico.subprocesso.processo.area.nome,
-                    tempoMedio: servico.tempo_medio ? `${servico.tempo_medio} min` : 'N/A',
-                    sla: servico.sla ? `${servico.sla}h` : 'N/A',
-                    status: servico.status === 'ativo' ? 'Ativo' : 'Inativo',
-                    demandaRotina: (servico.demanda_rotina as "Demanda" | "Rotina") || 'Demanda'
-                  }}
-                />
+                <ServiceCard key={servico.id} service={servico} />
               ))
+            ) : (
+              <div className="col-span-2 text-center py-8">
+                <div className="h-12 w-12 text-muted-foreground mx-auto mb-4">
+                  <svg
+                    className="h-full w-full"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-medium text-foreground mb-2">
+                  Nenhum serviço disponível
+                </h3>
+                <p className="text-muted-foreground">
+                  Ainda não há serviços cadastrados no sistema.
+                </p>
+              </div>
             )}
           </div>
 
@@ -209,7 +191,7 @@ const Index = () => {
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
                 <p className="mt-4 text-muted-foreground">Carregando áreas...</p>
               </div>
-            ) : (
+            ) : featuredAreas.length > 0 ? (
               featuredAreas.map(area => (
                 <AreaCard 
                   key={area.id} 
@@ -222,6 +204,30 @@ const Index = () => {
                   }}
                 />
               ))
+            ) : (
+              <div className="col-span-2 text-center py-8">
+                <div className="h-12 w-12 text-muted-foreground mx-auto mb-4">
+                  <svg
+                    className="h-full w-full"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+                    />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-medium text-foreground mb-2">
+                  Nenhuma área disponível
+                </h3>
+                <p className="text-muted-foreground">
+                  Ainda não há áreas cadastradas no sistema.
+                </p>
+              </div>
             )}
           </div>
 
@@ -237,20 +243,26 @@ const Index = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="py-16 bg-gradient-primary">
-        <div className="container mx-auto px-6 text-center">
-          <h2 className="text-3xl font-bold text-white mb-4">
-            Tem uma sugestão de melhoria?
-          </h2>
-          <p className="text-xl text-white/90 max-w-2xl mx-auto mb-8">
-            Colabore conosco! Sugira novos serviços ou melhorias nos processos existentes.
-          </p>
-          <Button asChild size="lg" variant="secondary" className="hover-lift">
-            <Link to="/sugestoes/nova">
-              Fazer Sugestão
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
-          </Button>
+      <section className="py-16">
+        <div className="container mx-auto px-6">
+          <Card className="max-w-4xl mx-auto text-center">
+            <CardHeader>
+              <CardTitle className="text-3xl font-bold text-foreground mb-4">
+                Precisa de um novo serviço?
+              </CardTitle>
+              <CardDescription className="text-lg text-muted-foreground">
+                Não encontrou o que procurava? Sugira um novo serviço para nossa equipe avaliar e implementar.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild size="lg" className="glow-primary">
+                <Link to="/sugestoes/nova">
+                  Sugerir Novo Serviço
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </section>
     </div>

@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useNavigate } from "react-router-dom";
+import { useServicos } from "@/hooks/useServicos";
+import { useAreas } from "@/hooks/useAreas";
 
 interface SearchSuggestion {
   id: string;
@@ -29,49 +31,89 @@ export function SearchBar({
   const [value, setValue] = useState("");
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
   const navigate = useNavigate();
+  
+  const { data: servicos } = useServicos();
+  const { data: areas } = useAreas();
 
-  // Mock suggestions - in real app, this would come from API
-  const mockSuggestions: SearchSuggestion[] = [
-    {
-      id: "1",
-      type: "produto",
-      title: "Abertura de Conta PJ",
-      subtitle: "Onboarding > Recursos Humanos",
-      path: "/servicos/1"
-    },
-    {
-      id: "2", 
-      type: "processo",
-      title: "Onboarding",
-      subtitle: "Recursos Humanos",
-      path: "/areas/rh/processos/onboarding"
-    },
-    {
-      id: "3",
-      type: "area",
-      title: "Recursos Humanos",
-      subtitle: "23 serviços disponíveis",
-      path: "/areas/rh"
-    },
-    {
-      id: "4",
-      type: "produto",
-      title: "Processamento de Folha",
-      subtitle: "Folha de Pagamento > Recursos Humanos",
-      path: "/servicos/4"
+  // Generate suggestions from real data
+  const generateSuggestions = (): SearchSuggestion[] => {
+    const allSuggestions: SearchSuggestion[] = [];
+
+    // Add services
+    if (servicos) {
+      servicos.forEach(servico => {
+        allSuggestions.push({
+          id: servico.id,
+          type: "produto",
+          title: servico.produto,
+          subtitle: `${servico.subprocesso.nome} > ${servico.subprocesso.processo.nome} > ${servico.subprocesso.processo.area.nome}`,
+          path: `/servicos/${servico.id}`
+        });
+      });
     }
-  ];
+
+    // Add areas
+    if (areas) {
+      areas.forEach(area => {
+        allSuggestions.push({
+          id: area.id,
+          type: "area",
+          title: area.nome,
+          subtitle: `${area.processos?.length || 0} processos disponíveis`,
+          path: `/areas/${area.id}`
+        });
+      });
+    }
+
+    // Add processes from areas
+    if (areas) {
+      areas.forEach(area => {
+        area.processos?.forEach(processo => {
+          allSuggestions.push({
+            id: processo.id,
+            type: "processo",
+            title: processo.nome,
+            subtitle: area.nome,
+            path: `/areas/${area.id}/processos/${processo.id}`
+          });
+        });
+      });
+    }
+
+    // Add subprocesses from services
+    if (servicos) {
+      const uniqueSubprocesses = new Map();
+      servicos.forEach(servico => {
+        const key = servico.subprocesso.id;
+        if (!uniqueSubprocesses.has(key)) {
+          uniqueSubprocesses.set(key, {
+            id: servico.subprocesso.id,
+            type: "subprocesso" as const,
+            title: servico.subprocesso.nome,
+            subtitle: `${servico.subprocesso.processo.nome} > ${servico.subprocesso.processo.area.nome}`,
+            path: `/processos/${servico.subprocesso.processo.id}/subprocessos/${servico.subprocesso.id}`
+          });
+        }
+      });
+      uniqueSubprocesses.forEach(subprocesso => {
+        allSuggestions.push(subprocesso);
+      });
+    }
+
+    return allSuggestions;
+  };
 
   useEffect(() => {
     if (value.length >= 2) {
       // Simulate API call delay
       const timer = setTimeout(() => {
-        const filtered = mockSuggestions.filter(
+        const allSuggestions = generateSuggestions();
+        const filtered = allSuggestions.filter(
           suggestion => 
             suggestion.title.toLowerCase().includes(value.toLowerCase()) ||
             suggestion.subtitle.toLowerCase().includes(value.toLowerCase())
         );
-        setSuggestions(filtered);
+        setSuggestions(filtered.slice(0, 8)); // Limit to 8 suggestions
         setOpen(showSuggestions && filtered.length > 0);
       }, 200);
 
@@ -80,7 +122,7 @@ export function SearchBar({
       setSuggestions([]);
       setOpen(false);
     }
-  }, [value, showSuggestions]);
+  }, [value, showSuggestions, servicos, areas]);
 
   const handleSelect = (suggestion: SearchSuggestion) => {
     setValue(suggestion.title);
@@ -147,7 +189,7 @@ export function SearchBar({
                   {suggestions.map((suggestion) => (
                     <CommandItem
                       key={suggestion.id}
-                      value={suggestion.title}
+                      value={suggestion.title || suggestion.id}
                       onSelect={() => handleSelect(suggestion)}
                       className="flex items-center space-x-3 cursor-pointer"
                     >

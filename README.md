@@ -1,73 +1,150 @@
-# Welcome to your Lovable project
+# BMG CSC Hub
 
-## Project info
+Portal do Centro de Serviços Compartilhados do Grupo BMG - Centralize, consulte e gerencie todos os serviços organizacional.
 
-**URL**: https://lovable.dev/projects/b3ec25c4-2aac-4854-8ce0-de8c50c887f7
+## 🚀 Funcionalidades
 
-## How can I edit this code?
+- **Catálogo de Serviços**: Explore todos os serviços disponíveis organizados por área, processo e subprocesso
+- **Navegação Intuitiva**: URLs amigáveis baseadas em nomes ao invés de UUIDs
+- **Busca Avançada**: Filtros por área, processo, subprocesso e status
+- **Sugestões**: Sistema para sugerir novos serviços ou melhorias
+- **Interface Moderna**: Design responsivo e acessível
 
-There are several ways of editing your application.
+## 🔗 URLs Amigáveis
 
-**Use Lovable**
+O sistema agora usa URLs amigáveis baseadas nos nomes das entidades, tornando a navegação muito mais intuitiva:
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/b3ec25c4-2aac-4854-8ce0-de8c50c887f7) and start prompting.
+### Exemplos de URLs:
 
-Changes made via Lovable will be committed automatically to this repo.
+**Antes (com UUIDs):**
+```
+/areas/123e4567-e89b-12d3-a456-426614174000
+/servicos/987fcdeb-51a2-43d1-9f12-345678901234
+```
 
-**Use your preferred IDE**
+**Agora (com slugs):**
+```
+/areas/recursos-humanos-123e4567-e89b-12d3-a456-426614174000
+/servicos/abertura-de-conta-pj-987fcdeb-51a2-43d1-9f12-345678901234
+```
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Estrutura das URLs:
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+- **Áreas**: `/areas/{nome-da-area}-{id}`
+  - Ex: `/areas/recursos-humanos-123e4567-e89b-12d3-a456-426614174000`
+  - Ex: `/areas/tecnologia-da-informacao-456e7890-f12c-34d5-b678-901234567890`
 
-Follow these steps:
+- **Serviços**: `/servicos/{nome-do-servico}-{id}`
+  - Ex: `/servicos/abertura-de-conta-pj-987fcdeb-51a2-43d1-9f12-345678901234`
+  - Ex: `/servicos/processamento-de-folha-abc123def-456g-789h-012i-345678901234`
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+### Benefícios:
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+1. **Intuitividade**: As URLs mostram claramente o que contêm
+2. **SEO**: Melhor para motores de busca
+3. **Compartilhamento**: URLs mais fáceis de compartilhar
+4. **Navegação**: Usuários podem entender a estrutura da URL
+5. **Manutenção**: Mais fácil de debugar e manter
 
-# Step 3: Install the necessary dependencies.
-npm i
+## 🛠️ Tecnologias
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+- **Frontend**: React + TypeScript + Vite
+- **UI**: Shadcn/ui + Tailwind CSS
+- **Backend**: Supabase (PostgreSQL)
+- **Estado**: TanStack Query (React Query)
+- **Roteamento**: React Router DOM
+
+## 📦 Instalação
+
+```bash
+# Clone o repositório
+git clone [url-do-repositorio]
+
+# Instale as dependências
+npm install
+
+# Configure as variáveis de ambiente
+cp .env.example .env.local
+
+# Execute o projeto
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## 🗄️ Estrutura do Banco
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+O sistema segue uma hierarquia clara:
 
-**Use GitHub Codespaces**
+```
+Área → Processo → Subprocesso → Serviço
+```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### Tabelas Principais:
 
-## What technologies are used for this project?
+- **areas**: Áreas organizacionais
+- **processos**: Processos dentro de cada área
+- **subprocessos**: Subprocessos dentro de cada processo
+- **servicos**: Serviços específicos oferecidos
+- **sugestoes**: Sugestões de novos serviços ou melhorias
 
-This project is built with:
+## 🎯 Funcionalidades Principais
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+### 1. Navegação por Área
+- Visualize todas as áreas disponíveis
+- Acesse detalhes específicos de cada área
+- Veja processos e serviços relacionados
 
-## How can I deploy this project?
+### 2. Catálogo de Serviços
+- Lista completa de todos os serviços
+- Filtros avançados por área, processo, status
+- Busca por nome do serviço
+- Visualização em grid ou lista
 
-Simply open [Lovable](https://lovable.dev/projects/b3ec25c4-2aac-4854-8ce0-de8c50c887f7) and click on Share -> Publish.
+### 3. Detalhes do Serviço
+- Informações completas sobre cada serviço
+- Tempo médio, SLA, requisitos
+- Breadcrumb de navegação
+- Links para serviços relacionados
 
-## Can I connect a custom domain to my Lovable project?
+### 4. Sistema de Sugestões
+- Sugerir novos serviços
+- Propor melhorias em serviços existentes
+- Acompanhamento de status das sugestões
 
-Yes, you can!
+## 🔧 Desenvolvimento
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+### Scripts Disponíveis:
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+```bash
+npm run dev          # Servidor de desenvolvimento
+npm run build        # Build de produção
+npm run preview      # Preview do build
+npm run lint         # Linting do código
+```
+
+### Estrutura de Pastas:
+
+```
+src/
+├── components/      # Componentes reutilizáveis
+├── hooks/          # Hooks customizados
+├── pages/          # Páginas da aplicação
+├── lib/            # Utilitários e configurações
+├── integrations/   # Integrações externas (Supabase)
+└── assets/         # Recursos estáticos
+```
+
+## 📝 Contribuição
+
+1. Fork o projeto
+2. Crie uma branch para sua feature (`git checkout -b feature/AmazingFeature`)
+3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
+4. Push para a branch (`git push origin feature/AmazingFeature`)
+5. Abra um Pull Request
+
+## 📄 Licença
+
+Este projeto está sob a licença MIT. Veja o arquivo `LICENSE` para mais detalhes.
+
+## 🤝 Suporte
+
+Para suporte, envie um email para [email] ou abra uma issue no repositório.

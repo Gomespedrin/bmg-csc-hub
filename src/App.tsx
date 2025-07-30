@@ -24,8 +24,8 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/por-area" element={<PorArea />} />
           <Route path="/servicos" element={<Servicos />} />
-          <Route path="/servicos/:id" element={<ServicoDetalhe />} />
-          <Route path="/areas/:areaId" element={<AreaDetalhe />} />
+          <Route path="/servicos/:slug" element={<ServicoDetalhe />} />
+          <Route path="/areas/:slug" element={<AreaDetalhe />} />
           <Route path="/sugestoes/nova" element={<NovaSugestao />} />
           <Route path="/admin/sugestoes" element={<AdminSugestoes />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

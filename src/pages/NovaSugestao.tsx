@@ -33,7 +33,7 @@ export default function NovaSugestao() {
     area: "",
     processo: "",
     subprocesso: "",
-    demandaRotina: "",
+    demandaRotina: "Demanda",
     oQueE: "",
     quemPodeUtilizar: "",
     tempoMedio: "",
@@ -183,13 +183,13 @@ export default function NovaSugestao() {
                       </SelectTrigger>
                       <SelectContent>
                         {areasLoading ? (
-                          <SelectItem value="" disabled>Carregando áreas...</SelectItem>
+                          <SelectItem value="loading" disabled>Carregando áreas...</SelectItem>
                         ) : areas?.length ? (
                           areas.map(area => (
                             <SelectItem key={area.id} value={area.nome}>{area.nome}</SelectItem>
                           ))
                         ) : (
-                          <SelectItem value="" disabled>Nenhuma área encontrada</SelectItem>
+                          <SelectItem value="no-areas" disabled>Nenhuma área encontrada</SelectItem>
                         )}
                       </SelectContent>
                     </Select>

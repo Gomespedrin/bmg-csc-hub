@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
+import { createAreaUrl } from "@/lib/utils";
 
 interface AreaCardProps {
   area: {
@@ -22,10 +23,11 @@ const getAreaIcon = (areaName: string) => {
 
 export function AreaCard({ area }: AreaCardProps) {
   const IconComponent = getAreaIcon(area.nome);
+  const areaUrl = createAreaUrl(area.nome, area.id);
 
   return (
     <Card className="group card-elevated hover-lift hover-glow cursor-pointer">
-      <Link to={`/areas/${area.id}`}>
+      <Link to={areaUrl}>
         <CardHeader className="pb-3">
           <div className="flex items-start space-x-4">
             <div className="p-2 rounded-lg bg-gradient-primary">

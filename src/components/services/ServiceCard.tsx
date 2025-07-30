@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
+import { createServicoUrl } from "@/lib/utils";
 
 interface ServiceCardProps {
   service: {
@@ -21,6 +22,7 @@ interface ServiceCardProps {
 export function ServiceCard({ service }: ServiceCardProps) {
   const statusVariant = service.status === "Ativo" ? "default" : "secondary";
   const statusColor = service.status === "Ativo" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600";
+  const servicoUrl = createServicoUrl(service.produto, service.id);
 
   return (
     <Card className="group card-elevated hover-lift hover-glow">
@@ -70,7 +72,7 @@ export function ServiceCard({ service }: ServiceCardProps) {
           </Badge>
 
           <Button asChild variant="outline" size="sm" className="group/btn">
-            <Link to={`/servicos/${service.id}`}>
+            <Link to={servicoUrl}>
               Ver detalhes
               <ArrowRight className="ml-2 h-3 w-3 group-hover/btn:translate-x-1 transition-smooth" />
             </Link>
