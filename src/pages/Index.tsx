@@ -3,19 +3,24 @@ import { ServiceCard } from "@/components/services/ServiceCard";
 import { AreaCard } from "@/components/areas/AreaCard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowRight, Search, Zap, Users, Target, TrendingUp } from "lucide-react";
+import { ArrowRight, Search, Zap, Users, Target, TrendingUp, Star, HelpCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useServicos } from "@/hooks/useServicos";
+import { useServicosPopulares } from "@/hooks/useServicosPopulares";
 import { useAreas } from "@/hooks/useAreas";
 import heroImage from "@/assets/hero-portal-csc.jpg";
 
 const Index = () => {
   const { data: servicosData, isLoading: servicosLoading } = useServicos();
+  const { data: servicosPopularesData, isLoading: servicosPopularesLoading } = useServicosPopulares(6);
   const { data: areas, isLoading: areasLoading } = useAreas();
 
   // Extrair dados dos serviços
   const servicos = (servicosData as any)?.services || [];
   const totalServicos = (servicosData as any)?.totalItems || 0;
+
+  // Extrair dados dos serviços populares
+  const servicosPopulares = (servicosPopularesData as any)?.services || [];
 
   // Convert servicos data for ServiceCard component
   const formattedServicos = servicos.map((servico: any) => ({
@@ -230,6 +235,122 @@ const Index = () => {
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* Serviços Mais Acessados */}
+      <section className="py-16">
+        <div className="container mx-auto px-6">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-foreground mb-4 flex items-center justify-center gap-3">
+              <Star className="h-8 w-8 text-warning" />
+              Serviços Mais Acessados
+            </h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              Os serviços mais populares e acessados pelos colaboradores.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            {servicosPopularesLoading ? (
+              <div className="col-span-full text-center py-8">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+                <p className="mt-4 text-muted-foreground">Carregando serviços populares...</p>
+              </div>
+            ) : servicosPopulares.length > 0 ? (
+              servicosPopulares.map(servico => (
+                <ServiceCard key={servico.id} service={servico} />
+              ))
+            ) : (
+              <div className="col-span-full text-center py-8">
+                <div className="h-12 w-12 text-muted-foreground mx-auto mb-4">
+                  <Star className="h-full w-full" />
+                </div>
+                <h3 className="text-lg font-medium text-foreground mb-2">
+                  Nenhum serviço popular disponível
+                </h3>
+                <p className="text-muted-foreground">
+                  Ainda não há dados de serviços mais acessados.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="text-center">
+            <Button asChild variant="outline" size="lg">
+              <Link to="/servicos">
+                Ver Todos os Serviços
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* Acessar FAQ Section */}
+      <section className="py-16 bg-muted/30">
+        <div className="container mx-auto px-6">
+          <div className="max-w-4xl mx-auto text-center">
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="text-center">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-primary/10 flex items-center justify-center">
+                  <HelpCircle className="h-8 w-8 text-primary" />
+                </div>
+                <CardTitle className="text-3xl font-bold text-foreground mb-4">
+                  Precisa de Ajuda?
+                </CardTitle>
+                <CardDescription className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                  Consulte nossas perguntas frequentes para encontrar respostas rápidas sobre nossos serviços, prazos e procedimentos.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <div className="text-center p-4 rounded-lg bg-background">
+                    <div className="w-12 h-12 mx-auto mb-3 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <Search className="h-6 w-6 text-primary" />
+                    </div>
+                    <h4 className="font-semibold text-foreground mb-2">Como Solicitar</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Aprenda como solicitar serviços e acompanhar suas demandas.
+                    </p>
+                  </div>
+                  <div className="text-center p-4 rounded-lg bg-background">
+                    <div className="w-12 h-12 mx-auto mb-3 rounded-lg bg-secondary/10 flex items-center justify-center">
+                      <Target className="h-6 w-6 text-secondary" />
+                    </div>
+                    <h4 className="font-semibold text-foreground mb-2">Prazos e SLA</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Entenda os prazos de entrega e níveis de serviço.
+                    </p>
+                  </div>
+                  <div className="text-center p-4 rounded-lg bg-background">
+                    <div className="w-12 h-12 mx-auto mb-3 rounded-lg bg-accent/10 flex items-center justify-center">
+                      <Users className="h-6 w-6 text-accent" />
+                    </div>
+                    <h4 className="font-semibold text-foreground mb-2">Suporte</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Entre em contato com nossa equipe de suporte.
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                  <Button asChild size="lg" className="glow-primary">
+                    <Link to="#faq">
+                      <HelpCircle className="mr-2 h-5 w-5" />
+                      Ver Perguntas Frequentes
+                    </Link>
+                  </Button>
+                  <Button asChild variant="outline" size="lg">
+                    <Link to="/sugestoes/nova">
+                      Sugerir Nova Pergunta
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Link>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </section>

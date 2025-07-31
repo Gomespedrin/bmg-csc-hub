@@ -37,11 +37,14 @@ export const useAreas = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('areas')
-        .select('*')
+        .select('id, nome, descricao, icone, ativo, created_at, updated_at')
         .eq('ativo', true)
         .order('nome');
       
       if (error) throw error;
+      
+      console.log('📊 Raw areas data from Supabase:', data?.map(a => ({ id: a.id, nome: a.nome, ativo: a.ativo })));
+      console.log('🔍 Sample area ID type:', typeof data?.[0]?.id);
       
       // Buscar processos para cada área
       const areasWithProcessos = await Promise.all(
@@ -70,9 +73,7 @@ export const useAreas = () => {
                     .from('servicos')
                     .select('id, produto, status')
                     .eq('subprocesso_id', subprocesso.id)
-                    .eq('ativo', true)
-                    // Remover filtro de status para contar todos os serviços
-                    // .eq('status', 'ativo');
+                    .eq('ativo', true);
 
                   return {
                     ...subprocesso,
@@ -103,6 +104,12 @@ export const useAreas = () => {
         })
       );
       
+      console.log('🏢 Areas loaded from Supabase:', areasWithProcessos.map(a => ({ id: a.id, nome: a.nome })));
+      console.log('🔍 First area details:', areasWithProcessos[0] ? {
+        id: areasWithProcessos[0].id,
+        nome: areasWithProcessos[0].nome,
+        processosCount: areasWithProcessos[0].processos?.length
+      } : 'No areas found');
       return areasWithProcessos as AreaCompleta[];
     },
   });

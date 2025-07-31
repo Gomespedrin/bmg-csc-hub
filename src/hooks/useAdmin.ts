@@ -560,3 +560,331 @@ export const useDeleteServico = () => {
     },
   });
 }; 
+
+// Hooks para Usuários
+export const useAdminUsers = () => {
+  return useQuery({
+    queryKey: ['admin-users'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('nome');
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+};
+
+export const useCreateUser = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  
+  return useMutation({
+    mutationFn: async (user: {
+      email: string;
+      nome: string;
+      perfil: string;
+      telefone?: string;
+      departamento?: string;
+    }) => {
+      const { data, error } = await supabase.auth.admin.createUser({
+        email: user.email,
+        password: 'temp123456', // Senha temporária
+        email_confirm: true,
+        user_metadata: {
+          nome: user.nome,
+          perfil: user.perfil,
+          telefone: user.telefone,
+          departamento: user.departamento,
+        }
+      });
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      toast({
+        title: "Usuário criado",
+        description: "O usuário foi criado com sucesso. Uma senha temporária foi enviada por email.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Erro",
+        description: "Erro ao criar usuário. Verifique se você está logado como administrador.",
+        variant: "destructive"
+      });
+    },
+  });
+};
+
+export const useUpdateUser = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  
+  return useMutation({
+    mutationFn: async ({ id, ...user }: {
+      id: string;
+      nome?: string;
+      perfil?: string;
+      telefone?: string;
+      departamento?: string;
+      ativo?: boolean;
+    }) => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .update(user)
+        .eq('user_id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      toast({
+        title: "Usuário atualizado",
+        description: "O usuário foi atualizado com sucesso.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar usuário. Verifique se você está logado como administrador.",
+        variant: "destructive"
+      });
+    },
+  });
+};
+
+export const useDeleteUser = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.auth.admin.deleteUser(id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      toast({
+        title: "Usuário excluído",
+        description: "O usuário foi excluído com sucesso.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Erro",
+        description: "Erro ao excluir usuário. Verifique se você está logado como administrador.",
+        variant: "destructive"
+      });
+    },
+  });
+};
+
+// Hooks para FAQ
+export const useAdminFAQ = () => {
+  return useQuery({
+    queryKey: ['admin-faq'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('faq')
+        .select('*')
+        .order('ordem, categoria');
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+};
+
+export const useCreateFAQ = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  
+  return useMutation({
+    mutationFn: async (faq: {
+      pergunta: string;
+      resposta: string;
+      categoria: string;
+      tags?: string;
+      ordem?: number;
+    }) => {
+      const { data, error } = await supabase
+        .from('faq')
+        .insert(faq)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-faq'] });
+      toast({
+        title: "FAQ criado",
+        description: "A pergunta frequente foi criada com sucesso.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Erro",
+        description: "Erro ao criar FAQ. Verifique se você está logado como administrador.",
+        variant: "destructive"
+      });
+    },
+  });
+};
+
+export const useUpdateFAQ = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  
+  return useMutation({
+    mutationFn: async ({ id, ...faq }: {
+      id: string;
+      pergunta?: string;
+      resposta?: string;
+      categoria?: string;
+      tags?: string;
+      ordem?: number;
+      ativo?: boolean;
+    }) => {
+      const { data, error } = await supabase
+        .from('faq')
+        .update(faq)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-faq'] });
+      toast({
+        title: "FAQ atualizado",
+        description: "A pergunta frequente foi atualizada com sucesso.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar FAQ. Verifique se você está logado como administrador.",
+        variant: "destructive"
+      });
+    },
+  });
+};
+
+export const useDeleteFAQ = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('faq')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-faq'] });
+      toast({
+        title: "FAQ excluído",
+        description: "A pergunta frequente foi excluída com sucesso.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Erro",
+        description: "Erro ao excluir FAQ. Verifique se você está logado como administrador.",
+        variant: "destructive"
+      });
+    },
+  });
+};
+
+// Hooks para Auditoria
+export const useAdminAuditoria = () => {
+  return useQuery({
+    queryKey: ['admin-auditoria'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('auditoria')
+        .select(`
+          *,
+          usuario:profiles(nome, email)
+        `)
+        .order('created_at', { ascending: false })
+        .limit(100);
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+};
+
+// Hooks para Configurações
+export const useAdminConfiguracoes = () => {
+  return useQuery({
+    queryKey: ['admin-configuracoes'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('configuracoes')
+        .select('*')
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+};
+
+export const useUpdateConfiguracoes = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  
+  return useMutation({
+    mutationFn: async (configuracoes: {
+      nome_portal?: string;
+      email_contato?: string;
+      notificacoes_email?: boolean;
+      notificacoes_push?: boolean;
+      notificacoes_sms?: boolean;
+      frequencia_backup?: string;
+      retencao_logs?: number;
+    }) => {
+      const { data, error } = await supabase
+        .from('configuracoes')
+        .upsert(configuracoes)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-configuracoes'] });
+      toast({
+        title: "Configurações atualizadas",
+        description: "As configurações foram atualizadas com sucesso.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar configurações. Verifique se você está logado como administrador.",
+        variant: "destructive"
+      });
+    },
+  });
+}; 

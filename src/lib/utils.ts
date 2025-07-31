@@ -28,23 +28,39 @@ export function createSlugWithId(name: string, id: string): string {
 export function extractIdFromSlug(slug: string): string {
   if (!slug) return '';
   
+  console.log('🔍 Extracting ID from slug:', slug);
+  
   // Procurar por um padrão UUID no final do slug
   const uuidPattern = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
   const match = slug.match(uuidPattern);
   
   if (match) {
+    console.log('✅ Found UUID match:', match[1]);
     return match[1];
   }
   
   // Fallback: retornar o último segmento se não encontrar UUID
   const parts = slug.split('-');
-  return parts[parts.length - 1] || '';
+  const lastPart = parts[parts.length - 1] || '';
+  
+  console.log('📝 Slug parts:', parts, 'Last part:', lastPart);
+  
+  // Verificar se o último segmento parece ser um UUID
+  if (uuidPattern.test(lastPart)) {
+    console.log('✅ Last part is UUID:', lastPart);
+    return lastPart;
+  }
+  
+  console.log('⚠️ No UUID found, returning last part:', lastPart);
+  return lastPart;
 }
 
 // Função para criar URL amigável para área
 export function createAreaUrl(areaName: string, areaId: string): string {
   const slug = createSlug(areaName);
-  return `/areas/${slug}-${areaId}`;
+  const finalUrl = `/areas/${slug}-${areaId}`;
+  console.log('🔗 Creating area URL:', { areaName, areaId, slug, finalUrl });
+  return finalUrl;
 }
 
 // Função para criar URL amigável para processo

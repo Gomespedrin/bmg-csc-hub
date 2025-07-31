@@ -84,9 +84,9 @@ export function Header() {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                   <Avatar className="h-8 w-8">
-                    <AvatarImage src={profile?.avatar_url} alt={profile?.full_name} />
+                    <AvatarImage src={profile?.avatar_url} alt={profile?.nome} />
                     <AvatarFallback className="bg-orange-500 text-white text-xs">
-                      {profile?.full_name?.charAt(0) || user.email?.charAt(0) || 'U'}
+                      {profile?.nome?.charAt(0) || user.email?.charAt(0) || 'U'}
                     </AvatarFallback>
                   </Avatar>
                 </Button>
@@ -95,7 +95,7 @@ export function Header() {
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
                     <p className="text-sm font-medium leading-none">
-                      {profile?.full_name || 'Usuário'}
+                      {profile?.nome || 'Usuário'}
                     </p>
                     <p className="text-xs leading-none text-muted-foreground">
                       {user.email}
@@ -119,15 +119,9 @@ export function Header() {
                   <>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild>
-                      <Link to="/admin/sugestoes" className="cursor-pointer">
+                      <Link to="/admin" className="cursor-pointer">
                         <Shield className="mr-2 h-4 w-4" />
-                        <span>Admin - Sugestões</span>
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link to="/admin/catalogo" className="cursor-pointer">
-                        <Shield className="mr-2 h-4 w-4" />
-                        <span>Admin - Catálogo</span>
+                        <span>Painel Administrativo</span>
                       </Link>
                     </DropdownMenuItem>
                   </>

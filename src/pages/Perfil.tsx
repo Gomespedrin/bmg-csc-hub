@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
+import { useMinhasSugestoes } from "@/hooks/useSugestoes";
 import { supabase } from "@/integrations/supabase/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { 
@@ -20,7 +21,10 @@ import {
   Save, 
   X,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Clock,
+  CheckCircle2,
+  XCircle
 } from "lucide-react";
 
 export default function Perfil() {
@@ -32,6 +36,17 @@ export default function Perfil() {
     nome: profile?.nome || '',
     email: profile?.email || '',
   });
+
+  // Buscar sugestões do usuário para estatísticas
+  const { data: minhasSugestoes } = useMinhasSugestoes();
+
+  // Calcular estatísticas reais
+  const estatisticas = {
+    enviadas: minhasSugestoes?.length || 0,
+    aprovadas: minhasSugestoes?.filter(s => s.status === 'aprovada').length || 0,
+    pendentes: minhasSugestoes?.filter(s => s.status === 'pendente').length || 0,
+    rejeitadas: minhasSugestoes?.filter(s => s.status === 'rejeitada').length || 0
+  };
 
   const updateProfile = useMutation({
     mutationFn: async (data: { nome: string; email: string }) => {
@@ -256,26 +271,62 @@ export default function Perfil() {
           {/* Estatísticas */}
           <Card>
             <CardHeader>
-              <CardTitle>Atividade</CardTitle>
+              <CardTitle className="flex items-center space-x-2">
+                <CheckCircle2 className="h-5 w-5" />
+                <span>Atividade</span>
+              </CardTitle>
               <CardDescription>
                 Resumo da sua atividade no sistema
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-primary">0</p>
-                  <p className="text-sm text-muted-foreground">Sugestões Enviadas</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="text-center p-3 bg-blue-50 rounded-lg">
+                  <div className="flex items-center justify-center mb-2">
+                    <Clock className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <p className="text-2xl font-bold text-blue-600">{estatisticas.enviadas}</p>
+                  <p className="text-xs text-blue-700 font-medium">Sugestões Enviadas</p>
                 </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-green-600">0</p>
-                  <p className="text-sm text-muted-foreground">Sugestões Aprovadas</p>
+                <div className="text-center p-3 bg-green-50 rounded-lg">
+                  <div className="flex items-center justify-center mb-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  </div>
+                  <p className="text-2xl font-bold text-green-600">{estatisticas.aprovadas}</p>
+                  <p className="text-xs text-green-700 font-medium">Aprovadas</p>
                 </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-orange-600">0</p>
-                  <p className="text-sm text-muted-foreground">Sugestões Pendentes</p>
+                <div className="text-center p-3 bg-orange-50 rounded-lg">
+                  <div className="flex items-center justify-center mb-2">
+                    <Clock className="h-4 w-4 text-orange-600" />
+                  </div>
+                  <p className="text-2xl font-bold text-orange-600">{estatisticas.pendentes}</p>
+                  <p className="text-xs text-orange-700 font-medium">Pendentes</p>
+                </div>
+                <div className="text-center p-3 bg-red-50 rounded-lg">
+                  <div className="flex items-center justify-center mb-2">
+                    <XCircle className="h-4 w-4 text-red-600" />
+                  </div>
+                  <p className="text-2xl font-bold text-red-600">{estatisticas.rejeitadas}</p>
+                  <p className="text-xs text-red-700 font-medium">Rejeitadas</p>
                 </div>
               </div>
+              
+              {estatisticas.enviadas > 0 && (
+                <div className="mt-4 p-3 bg-muted/50 rounded-lg">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Taxa de aprovação</span>
+                    <span className="font-medium">
+                      {Math.round((estatisticas.aprovadas / estatisticas.enviadas) * 100)}%
+                    </span>
+                  </div>
+                  <div className="w-full bg-muted rounded-full h-2 mt-2">
+                    <div 
+                      className="bg-green-500 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${(estatisticas.aprovadas / estatisticas.enviadas) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

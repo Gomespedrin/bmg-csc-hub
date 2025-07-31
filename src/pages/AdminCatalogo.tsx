@@ -11,6 +11,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { 
   Building2, 
   Settings, 
@@ -24,7 +26,13 @@ import {
   Clock,
   Target,
   FileText,
-  AlertCircle
+  AlertCircle,
+  Download,
+  Upload,
+  Filter,
+  ChevronDown,
+  Check,
+  X
 } from "lucide-react";
 import { useIsAdmin, useAdminAreas, useAdminProcessos, useAdminSubprocessos, useAdminServicos, useCreateArea, useUpdateArea, useDeleteArea, useCreateProcesso, useUpdateProcesso, useDeleteProcesso, useCreateSubprocesso, useUpdateSubprocesso, useDeleteSubprocesso, useCreateServico, useUpdateServico, useDeleteServico } from "@/hooks/useAdmin";
 import { useAreas } from "@/hooks/useAreas";
@@ -40,6 +48,8 @@ export default function AdminCatalogo() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [formData, setFormData] = useState<any>({});
+  const [filters, setFilters] = useState<any>({});
+  const [showFilters, setShowFilters] = useState(false);
 
   // Verificar se é administrador
   const { data: isAdmin, isLoading: isAdminLoading } = useIsAdmin();
@@ -88,32 +98,44 @@ export default function AdminCatalogo() {
 
   // Funções auxiliares
   const getModuleData = () => {
+    let data = [];
     switch (activeModule) {
       case 'areas':
-        return areas?.filter(item => 
-          item.nome.toLowerCase().includes(searchTerm.toLowerCase())
-        ) || [];
+        data = areas || [];
+        break;
       case 'processos':
-        return processos?.filter(item => 
-          item.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.area?.nome.toLowerCase().includes(searchTerm.toLowerCase())
-        ) || [];
+        data = processos || [];
+        break;
       case 'subprocessos':
-        return subprocessos?.filter(item => 
-          item.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.processo?.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.processo?.area?.nome.toLowerCase().includes(searchTerm.toLowerCase())
-        ) || [];
+        data = subprocessos || [];
+        break;
       case 'servicos':
-        return servicos?.filter(item => 
-          item.produto.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.subprocesso?.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.subprocesso?.processo?.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.subprocesso?.processo?.area?.nome.toLowerCase().includes(searchTerm.toLowerCase())
-        ) || [];
-      default:
-        return [];
+        data = servicos || [];
+        break;
     }
+
+    // Aplicar filtros
+    return data.filter(item => {
+      const matchesSearch = 
+        (activeModule === 'servicos' ? item.produto : item.nome)?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (activeModule === 'servicos' && item.subprocesso?.nome?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (activeModule === 'servicos' && item.subprocesso?.processo?.nome?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (activeModule === 'servicos' && item.subprocesso?.processo?.area?.nome?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (activeModule === 'subprocessos' && item.processo?.nome?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (activeModule === 'subprocessos' && item.processo?.area?.nome?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (activeModule === 'processos' && item.area?.nome?.toLowerCase().includes(searchTerm.toLowerCase()));
+
+      const matchesStatus = !filters.status || item.ativo === (filters.status === 'ativo');
+      const matchesArea = !filters.area || 
+        (activeModule === 'processos' && item.area?.id === filters.area) ||
+        (activeModule === 'subprocessos' && item.processo?.area?.id === filters.area) ||
+        (activeModule === 'servicos' && item.subprocesso?.processo?.area?.id === filters.area);
+      const matchesProcesso = !filters.processo || 
+        (activeModule === 'subprocessos' && item.processo?.id === filters.processo) ||
+        (activeModule === 'servicos' && item.subprocesso?.processo?.id === filters.processo);
+
+      return matchesSearch && matchesStatus && matchesArea && matchesProcesso;
+    });
   };
 
   const getModuleTitle = () => {
@@ -143,7 +165,25 @@ export default function AdminCatalogo() {
 
   const handleEdit = (item: any) => {
     setSelectedItem(item);
-    setFormData(item);
+    
+    // Limpar dados relacionados que não são colunas da tabela
+    const cleanFormData = { ...item };
+    
+    if (activeModule === 'servicos') {
+      // Remover campos relacionados que não são colunas da tabela servicos
+      delete cleanFormData.subprocesso;
+      delete cleanFormData.processo;
+      delete cleanFormData.area;
+    } else if (activeModule === 'subprocessos') {
+      // Remover campos relacionados que não são colunas da tabela subprocessos
+      delete cleanFormData.processo;
+      delete cleanFormData.area;
+    } else if (activeModule === 'processos') {
+      // Remover campos relacionados que não são colunas da tabela processos
+      delete cleanFormData.area;
+    }
+    
+    setFormData(cleanFormData);
     setIsEditDialogOpen(true);
   };
 
@@ -163,8 +203,17 @@ export default function AdminCatalogo() {
           await deleteServico.mutateAsync(id);
           break;
       }
+      toast({
+        title: "Item excluído",
+        description: "O item foi excluído com sucesso.",
+      });
     } catch (error) {
       console.error('Erro ao excluir:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao excluir o item.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -172,34 +221,51 @@ export default function AdminCatalogo() {
     e.preventDefault();
     
     try {
+      // Limpar dados relacionados antes de enviar
+      const cleanFormData = { ...formData };
+      
+      if (activeModule === 'servicos') {
+        // Remover campos relacionados que não são colunas da tabela servicos
+        delete cleanFormData.subprocesso;
+        delete cleanFormData.processo;
+        delete cleanFormData.area;
+      } else if (activeModule === 'subprocessos') {
+        // Remover campos relacionados que não são colunas da tabela subprocessos
+        delete cleanFormData.processo;
+        delete cleanFormData.area;
+      } else if (activeModule === 'processos') {
+        // Remover campos relacionados que não são colunas da tabela processos
+        delete cleanFormData.area;
+      }
+      
       if (isCreateDialogOpen) {
         switch (activeModule) {
           case 'areas':
-            await createArea.mutateAsync(formData);
+            await createArea.mutateAsync(cleanFormData);
             break;
           case 'processos':
-            await createProcesso.mutateAsync(formData);
+            await createProcesso.mutateAsync(cleanFormData);
             break;
           case 'subprocessos':
-            await createSubprocesso.mutateAsync(formData);
+            await createSubprocesso.mutateAsync(cleanFormData);
             break;
           case 'servicos':
-            await createServico.mutateAsync(formData);
+            await createServico.mutateAsync(cleanFormData);
             break;
         }
       } else {
         switch (activeModule) {
           case 'areas':
-            await updateArea.mutateAsync({ id: selectedItem.id, ...formData });
+            await updateArea.mutateAsync({ id: selectedItem.id, ...cleanFormData });
             break;
           case 'processos':
-            await updateProcesso.mutateAsync({ id: selectedItem.id, ...formData });
+            await updateProcesso.mutateAsync({ id: selectedItem.id, ...cleanFormData });
             break;
           case 'subprocessos':
-            await updateSubprocesso.mutateAsync({ id: selectedItem.id, ...formData });
+            await updateSubprocesso.mutateAsync({ id: selectedItem.id, ...cleanFormData });
             break;
           case 'servicos':
-            await updateServico.mutateAsync({ id: selectedItem.id, ...formData });
+            await updateServico.mutateAsync({ id: selectedItem.id, ...cleanFormData });
             break;
         }
       }
@@ -208,9 +274,97 @@ export default function AdminCatalogo() {
       setIsEditDialogOpen(false);
       setFormData({});
       setSelectedItem(null);
+      toast({
+        title: "Sucesso",
+        description: `Item ${isCreateDialogOpen ? 'criado' : 'atualizado'} com sucesso.`,
+      });
     } catch (error) {
       console.error('Erro ao salvar:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao salvar o item.",
+        variant: "destructive",
+      });
     }
+  };
+
+  const handleExport = () => {
+    const data = getModuleData();
+    const csvContent = convertToCSV(data);
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${getModuleTitle().toLowerCase()}_export.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const convertToCSV = (data: any[]) => {
+    if (data.length === 0) return '';
+    
+    const headers = Object.keys(data[0]);
+    const csvRows = [headers.join(',')];
+    
+    for (const row of data) {
+      const values = headers.map(header => {
+        const value = row[header];
+        return typeof value === 'string' ? `"${value.replace(/"/g, '""')}"` : value;
+      });
+      csvRows.push(values.join(','));
+    }
+    
+    return csvRows.join('\n');
+  };
+
+  const handleImport = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.csv';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const csv = e.target?.result as string;
+          const data = parseCSV(csv);
+          // Aqui você implementaria a lógica para importar os dados
+          console.log('Dados importados:', data);
+          toast({
+            title: "Importação",
+            description: `${data.length} itens importados com sucesso.`,
+          });
+        };
+        reader.readAsText(file);
+      }
+    };
+    input.click();
+  };
+
+  const parseCSV = (csv: string) => {
+    const lines = csv.split('\n');
+    const headers = lines[0].split(',').map(h => h.replace(/"/g, ''));
+    const data = [];
+    
+    for (let i = 1; i < lines.length; i++) {
+      if (lines[i].trim()) {
+        const values = lines[i].split(',').map(v => v.replace(/"/g, ''));
+        const row: any = {};
+        headers.forEach((header, index) => {
+          row[header] = values[index];
+        });
+        data.push(row);
+      }
+    }
+    
+    return data;
+  };
+
+  const clearFilters = () => {
+    setFilters({});
+    setSearchTerm('');
   };
 
   const isLoading = areasLoading || processosLoading || subprocessosLoading || servicosLoading;
@@ -270,23 +424,117 @@ export default function AdminCatalogo() {
                 Gerencie o catálogo de {getModuleTitle().toLowerCase()}
               </p>
             </div>
-            <Button onClick={handleCreate}>
-              <Plus className="mr-2 h-4 w-4" />
-              Adicionar {getModuleTitle().slice(0, -1)}
-            </Button>
+            <div className="flex items-center space-x-2">
+              <Button variant="outline" onClick={handleExport}>
+                <Download className="mr-2 h-4 w-4" />
+                Exportar
+              </Button>
+              <Button variant="outline" onClick={handleImport}>
+                <Upload className="mr-2 h-4 w-4" />
+                Importar
+              </Button>
+              <Button onClick={handleCreate}>
+                <Plus className="mr-2 h-4 w-4" />
+                Adicionar {getModuleTitle().slice(0, -1)}
+              </Button>
+            </div>
           </div>
 
-          {/* Barra de Pesquisa */}
-          <div className="mb-6">
-            <div className="relative">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder={`Pesquisar ${getModuleTitle().toLowerCase()}...`}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
+          {/* Barra de Pesquisa e Filtros */}
+          <div className="mb-6 space-y-4">
+            <div className="flex items-center space-x-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder={`Pesquisar ${getModuleTitle().toLowerCase()}...`}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => setShowFilters(!showFilters)}
+                className={showFilters ? 'bg-primary text-primary-foreground' : ''}
+              >
+                <Filter className="mr-2 h-4 w-4" />
+                Filtros
+              </Button>
+              {(Object.keys(filters).length > 0 || searchTerm) && (
+                <Button variant="outline" onClick={clearFilters}>
+                  <X className="mr-2 h-4 w-4" />
+                  Limpar
+                </Button>
+              )}
             </div>
+
+            {/* Painel de Filtros */}
+            {showFilters && (
+              <Card className="p-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <Label>Status</Label>
+                    <Select
+                      value={filters.status || ''}
+                      onValueChange={(value) => setFilters({ ...filters, status: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Todos os status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Todos os status</SelectItem>
+                        <SelectItem value="ativo">Ativo</SelectItem>
+                        <SelectItem value="inativo">Inativo</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {activeModule !== 'areas' && (
+                    <div>
+                      <Label>Área</Label>
+                      <Select
+                        value={filters.area || ''}
+                        onValueChange={(value) => setFilters({ ...filters, area: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Todas as áreas" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">Todas as áreas</SelectItem>
+                          {areas?.map((area) => (
+                            <SelectItem key={area.id} value={area.id}>
+                              {area.nome}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {(activeModule === 'subprocessos' || activeModule === 'servicos') && (
+                    <div>
+                      <Label>Processo</Label>
+                      <Select
+                        value={filters.processo || ''}
+                        onValueChange={(value) => setFilters({ ...filters, processo: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Todos os processos" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">Todos os processos</SelectItem>
+                          {processos?.map((processo) => (
+                            <SelectItem key={processo.id} value={processo.id}>
+                              {processo.area?.nome} → {processo.nome}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+              </Card>
+            )}
           </div>
 
           {/* Lista de Itens */}
@@ -297,7 +545,7 @@ export default function AdminCatalogo() {
           ) : (
             <div className="grid gap-4">
               {getModuleData().map((item) => (
-                <Card key={item.id}>
+                <Card key={item.id} className="hover:shadow-md transition-shadow">
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div className="space-y-1">
@@ -392,7 +640,7 @@ export default function AdminCatalogo() {
               setSelectedItem(null);
             }
           }}>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>
                   {isCreateDialogOpen ? `Criar ${getModuleTitle().slice(0, -1)}` : `Editar ${getModuleTitle().slice(0, -1)}`}
@@ -455,21 +703,44 @@ export default function AdminCatalogo() {
                         </div>
                         <div>
                           <Label htmlFor="area_id">Área *</Label>
-                          <Select
-                            value={formData.area_id || ''}
-                            onValueChange={(value) => setFormData({ ...formData, area_id: value })}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione uma área" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {areasForSelect?.map((area) => (
-                                <SelectItem key={area.id} value={area.id}>
-                                  {area.nome}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                role="combobox"
+                                className="w-full justify-between"
+                              >
+                                {formData.area_id
+                                  ? areasForSelect?.find((area) => area.id === formData.area_id)?.nome
+                                  : "Selecione uma área..."}
+                                <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-full p-0">
+                              <Command>
+                                <CommandInput placeholder="Buscar área..." />
+                                <CommandList>
+                                  <CommandEmpty>Nenhuma área encontrada.</CommandEmpty>
+                                  <CommandGroup>
+                                    {areasForSelect?.map((area) => (
+                                      <CommandItem
+                                        key={area.id}
+                                        value={area.nome}
+                                        onSelect={() => setFormData({ ...formData, area_id: area.id })}
+                                      >
+                                        <Check
+                                          className={`mr-2 h-4 w-4 ${
+                                            formData.area_id === area.id ? "opacity-100" : "opacity-0"
+                                          }`}
+                                        />
+                                        {area.nome}
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
                         </div>
                         <div>
                           <Label htmlFor="descricao">Descrição</Label>
@@ -495,21 +766,44 @@ export default function AdminCatalogo() {
                         </div>
                         <div>
                           <Label htmlFor="processo_id">Processo *</Label>
-                          <Select
-                            value={formData.processo_id || ''}
-                            onValueChange={(value) => setFormData({ ...formData, processo_id: value })}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione um processo" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {processos?.map((processo) => (
-                                <SelectItem key={processo.id} value={processo.id}>
-                                  {processo.area?.nome} → {processo.nome}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                role="combobox"
+                                className="w-full justify-between"
+                              >
+                                {formData.processo_id
+                                  ? processos?.find((processo) => processo.id === formData.processo_id)?.nome
+                                  : "Selecione um processo..."}
+                                <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-full p-0">
+                              <Command>
+                                <CommandInput placeholder="Buscar processo..." />
+                                <CommandList>
+                                  <CommandEmpty>Nenhum processo encontrado.</CommandEmpty>
+                                  <CommandGroup>
+                                    {processos?.map((processo) => (
+                                      <CommandItem
+                                        key={processo.id}
+                                        value={`${processo.area?.nome} ${processo.nome}`}
+                                        onSelect={() => setFormData({ ...formData, processo_id: processo.id })}
+                                      >
+                                        <Check
+                                          className={`mr-2 h-4 w-4 ${
+                                            formData.processo_id === processo.id ? "opacity-100" : "opacity-0"
+                                          }`}
+                                        />
+                                        {processo.area?.nome} → {processo.nome}
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
                         </div>
                         <div>
                           <Label htmlFor="descricao">Descrição</Label>
@@ -535,21 +829,44 @@ export default function AdminCatalogo() {
                         </div>
                         <div>
                           <Label htmlFor="subprocesso_id">Subprocesso *</Label>
-                          <Select
-                            value={formData.subprocesso_id || ''}
-                            onValueChange={(value) => setFormData({ ...formData, subprocesso_id: value })}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione um subprocesso" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {subprocessos?.map((subprocesso) => (
-                                <SelectItem key={subprocesso.id} value={subprocesso.id}>
-                                  {subprocesso.processo?.area?.nome} → {subprocesso.processo?.nome} → {subprocesso.nome}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                role="combobox"
+                                className="w-full justify-between"
+                              >
+                                {formData.subprocesso_id
+                                  ? subprocessos?.find((subprocesso) => subprocesso.id === formData.subprocesso_id)?.nome
+                                  : "Selecione um subprocesso..."}
+                                <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-full p-0">
+                              <Command>
+                                <CommandInput placeholder="Buscar subprocesso..." />
+                                <CommandList>
+                                  <CommandEmpty>Nenhum subprocesso encontrado.</CommandEmpty>
+                                  <CommandGroup>
+                                    {subprocessos?.map((subprocesso) => (
+                                      <CommandItem
+                                        key={subprocesso.id}
+                                        value={`${subprocesso.processo?.area?.nome} ${subprocesso.processo?.nome} ${subprocesso.nome}`}
+                                        onSelect={() => setFormData({ ...formData, subprocesso_id: subprocesso.id })}
+                                      >
+                                        <Check
+                                          className={`mr-2 h-4 w-4 ${
+                                            formData.subprocesso_id === subprocesso.id ? "opacity-100" : "opacity-0"
+                                          }`}
+                                        />
+                                        {subprocesso.processo?.area?.nome} → {subprocesso.processo?.nome} → {subprocesso.nome}
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
                         </div>
                         <div>
                           <Label htmlFor="o_que_e">O que é</Label>

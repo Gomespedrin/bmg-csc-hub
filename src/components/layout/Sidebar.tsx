@@ -1,22 +1,20 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useIsAdmin } from "@/hooks/useAdmin";
-import { cn } from "@/lib/utils";
 import {
   Home,
   Building2,
   Package,
   Plus,
   FileText,
-  Settings,
-  User,
   Shield,
-  Menu,
-  X
+  X,
+  Pin,
+  PinOff
 } from "lucide-react";
 
 interface SidebarProps {
@@ -63,115 +61,104 @@ export function Sidebar({ isOpen, onToggle, isPinned, onTogglePin }: SidebarProp
       badge: null
     }] : []),
     ...(isAdmin ? [{
-      title: "Admin - Sugestões",
+      title: "Painel Administrativo",
       icon: Shield,
-      href: "/admin/sugestoes",
-      badge: "Admin"
-    }, {
-      title: "Admin - Catálogo",
-      icon: Shield,
-      href: "/admin/catalogo",
+      href: "/admin",
       badge: "Admin"
     }] : [])
   ];
 
   return (
     <div
-      className={cn(
-        "fixed left-0 top-14 h-[calc(100vh-3.5rem)] bg-gray-100 border-r border-gray-300 z-40",
-        isOpen ? "w-64" : "w-16"
-      )}
+      className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 ease-in-out ${
+        isOpen ? "translate-x-0" : "-translate-x-full"
+      } ${isPinned ? "translate-x-0" : ""}`}
     >
-      {/* Header da Sidebar */}
-      <div className="flex items-center justify-between p-3 border-b border-gray-300 bg-gray-200">
-        {isOpen && (
-          <div className="flex items-center space-x-2">
-            <div className="h-6 w-6 rounded bg-orange-500 flex items-center justify-center">
-              <span className="text-white font-bold text-xs">CSC</span>
-            </div>
-            <span className="font-semibold text-gray-800 text-sm">Portal CSC</span>
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 border-b border-gray-200">
+        <div className="flex items-center space-x-2">
+          <div className="h-8 w-8 rounded bg-orange-500 flex items-center justify-center">
+            <span className="text-white font-bold text-sm">CSC</span>
           </div>
-        )}
-        
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onToggle}
-          className="h-6 w-6 p-0 hover:bg-gray-300"
-        >
-          {isOpen ? <X className="h-3 w-3" /> : <Menu className="h-3 w-3" />}
-        </Button>
+          <div>
+            <h2 className="text-sm font-semibold text-gray-800">Portal CSC</h2>
+            <p className="text-xs text-gray-500">Centro de Serviços</p>
+          </div>
+        </div>
+        <div className="flex items-center space-x-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onTogglePin}
+            className="h-8 w-8 p-0"
+          >
+            {isPinned ? (
+              <PinOff className="h-4 w-4" />
+            ) : (
+              <Pin className="h-4 w-4" />
+            )}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onToggle}
+            className="h-8 w-8 p-0 md:hidden"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
-      {/* Conteúdo da Sidebar */}
-      <div className="flex flex-col h-full">
-        {/* Menu Principal */}
-        <nav className="flex-1 p-3 space-y-1">
-          {menuItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = location.pathname === item.href;
-            
-            return (
-              <Link
-                key={item.href}
-                to={item.href}
-                className={cn(
-                  "flex items-center space-x-3 px-2 py-2 rounded text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-blue-500 text-white"
-                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-200"
-                )}
-              >
-                <Icon className="h-4 w-4 flex-shrink-0" />
-                {isOpen && (
-                  <>
-                    <span className="flex-1">{item.title}</span>
-                    {item.badge && (
-                      <Badge variant="secondary" className="text-xs bg-gray-200 text-gray-700">
-                        {item.badge}
-                      </Badge>
-                    )}
-                  </>
+      {/* Menu Items */}
+      <nav className="p-4 space-y-2">
+        {menuItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = location.pathname === item.href;
+          
+          return (
+            <Button
+              key={item.href}
+              variant={isActive ? "default" : "ghost"}
+              className="w-full justify-start"
+              asChild
+            >
+              <Link to={item.href}>
+                <Icon className="mr-2 h-4 w-4" />
+                <span className="flex-1 text-left">{item.title}</span>
+                {item.badge && (
+                  <Badge variant="secondary" className="ml-auto">
+                    {item.badge}
+                  </Badge>
                 )}
               </Link>
-            );
-          })}
-        </nav>
+            </Button>
+          );
+        })}
+      </nav>
 
-        {/* Footer da Sidebar */}
-        {user && isOpen && (
-          <>
-            <Separator className="mx-3" />
-            <div className="p-3 space-y-1">
-              <Link
-                to="/perfil"
-                className={cn(
-                  "flex items-center space-x-3 px-2 py-2 rounded text-sm font-medium transition-colors",
-                  location.pathname === "/perfil"
-                    ? "bg-blue-500 text-white"
-                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-200"
-                )}
-              >
-                <User className="h-4 w-4 flex-shrink-0" />
-                <span className="flex-1">Perfil</span>
-              </Link>
-              
-              <Link
-                to="/configuracoes"
-                className={cn(
-                  "flex items-center space-x-3 px-2 py-2 rounded text-sm font-medium transition-colors",
-                  location.pathname === "/configuracoes"
-                    ? "bg-blue-500 text-white"
-                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-200"
-                )}
-              >
-                <Settings className="h-4 w-4 flex-shrink-0" />
-                <span className="flex-1">Configurações</span>
-              </Link>
+      {/* Separator */}
+      <Separator className="mx-4" />
+
+      {/* User Info */}
+      {user && (
+        <div className="p-4">
+          <div className="flex items-center space-x-3">
+            <div className="h-8 w-8 rounded-full bg-orange-500 flex items-center justify-center">
+              <span className="text-white text-xs font-medium">
+                {user.email?.charAt(0).toUpperCase() || 'U'}
+              </span>
             </div>
-          </>
-        )}
-      </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-800 truncate">
+                {user.email}
+              </p>
+              <p className="text-xs text-gray-500">
+                {isAdmin ? 'Administrador' : 'Usuário'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

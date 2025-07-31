@@ -32,9 +32,10 @@
     --accent-foreground: 260 12% 15%;
 
     /* BMG Yellow */
-    --warning: 48 100% 50%;
+    --warning: 45 100% 50%;
     --warning-foreground: 260 12% 15%;
 
+    /* Neutral Colors */
     --muted: 210 40% 96%;
     --muted-foreground: 260 8% 45%;
 
@@ -48,35 +49,28 @@
     --radius: 0.75rem;
 
     /* Design System Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
-    --gradient-secondary: linear-gradient(135deg, hsl(var(--secondary)), hsl(260 45% 40%));
-    --gradient-hero: linear-gradient(135deg, hsl(var(--primary) / 0.1), hsl(var(--accent) / 0.1));
-    --gradient-card: linear-gradient(180deg, hsl(var(--card)), hsl(var(--muted) / 0.3));
+    --gradient-primary: linear-gradient(135deg, hsl(22, 100%, 50%) 0%, hsl(22, 100%, 60%) 100%);
+    --gradient-secondary: linear-gradient(135deg, hsl(260, 45%, 31%) 0%, hsl(260, 45%, 41%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(167, 95%, 60%) 0%, hsl(167, 95%, 70%) 100%);
 
     /* Shadows */
-    --shadow-soft: 0 4px 20px -4px hsl(var(--primary) / 0.1);
-    --shadow-card: 0 8px 32px -8px hsl(var(--foreground) / 0.1);
-    --shadow-glow: 0 0 40px hsl(var(--primary) / 0.2);
+    --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.06);
+    --shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.08);
+    --shadow-elevated: 0 8px 24px rgba(0, 0, 0, 0.12);
 
-    /* Animations */
-    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    /* Transitions */
+    --transition-smooth: all 0.2s ease-in-out;
+    --transition-hover: all 0.3s ease-in-out;
 
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Sidebar Colors */
+    --sidebar-background: 260 12% 8%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 22 100% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 260 8% 15%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-border: 260 8% 20%;
+    --sidebar-ring: 22 100% 55%;
   }
 
   .dark {
@@ -122,46 +116,21 @@
   * {
     @apply border-border;
   }
-
   body {
-    @apply bg-background text-foreground font-sans antialiased;
-    font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    @apply bg-background text-foreground;
+    font-family: 'Montserrat', sans-serif;
   }
 }
 
 @layer components {
-  /* Hero Gradient Background */
-  .hero-gradient {
-    background: var(--gradient-hero);
-  }
-
   /* Card with soft shadow */
   .card-elevated {
     box-shadow: var(--shadow-card);
   }
 
-  /* Glow effect for CTAs */
-  .glow-primary {
-    box-shadow: var(--shadow-glow);
-  }
-
   /* Smooth transitions */
   .transition-smooth {
     transition: var(--transition-smooth);
-  }
-
-  /* Bounce animation */
-  .transition-bounce {
-    transition: var(--transition-bounce);
-  }
-
-  /* Service status badges */
-  .status-active {
-    @apply bg-green-100 text-green-800 border-green-200;
-  }
-
-  .status-inactive {
-    @apply bg-gray-100 text-gray-600 border-gray-200;
   }
 
   /* Hover effects */
@@ -171,5 +140,176 @@
 
   .hover-glow {
     @apply transition-smooth hover:shadow-[0_0_20px_rgba(255,99,0,0.3)];
+  }
+
+  /* Estilos para line-clamp */
+  .line-clamp-1 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+  }
+  
+  .line-clamp-2 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+  
+  .line-clamp-3 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+  }
+  
+  /* Estilos para gradientes sutis */
+  .bg-gradient-subtle {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(249, 250, 251, 0.8) 100%);
+  }
+  
+  /* Estilos para animações de loading */
+  .animate-pulse-slow {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  
+  /* Estilos para badges com cores personalizadas */
+  .badge-success {
+    @apply bg-green-100 text-green-800 border-green-200;
+  }
+  
+  .badge-warning {
+    @apply bg-yellow-100 text-yellow-800 border-yellow-200;
+  }
+  
+  .badge-error {
+    @apply bg-red-100 text-red-800 border-red-200;
+  }
+  
+  .badge-info {
+    @apply bg-blue-100 text-blue-800 border-blue-200;
+  }
+  
+  /* Estilos para hover states melhorados */
+  .hover-scale-subtle {
+    @apply hover:scale-[1.02] transition-transform duration-200;
+  }
+  
+  .hover-border-primary {
+    @apply hover:border-primary/50 transition-colors duration-200;
+  }
+  
+  /* Estilos para transições suaves */
+  .transition-all-smooth {
+    @apply transition-all duration-300 ease-in-out;
+  }
+  
+  /* Estilos para sombras personalizadas */
+  .shadow-soft {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+  
+  .shadow-medium {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  }
+  
+  .shadow-strong {
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  }
+  
+  /* Estilos para bordas arredondadas personalizadas */
+  .rounded-xl-soft {
+    border-radius: 0.75rem;
+  }
+  
+  /* Estilos para espaçamentos consistentes */
+  .space-y-consistent > * + * {
+    margin-top: 1rem;
+  }
+  
+  /* Estilos para flex layouts responsivos */
+  .flex-responsive {
+    @apply flex flex-col md:flex-row;
+  }
+  
+  .grid-responsive {
+    @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3;
+  }
+  
+  /* Estilos para textos responsivos */
+  .text-responsive-sm {
+    @apply text-xs sm:text-sm;
+  }
+  
+  .text-responsive-base {
+    @apply text-sm sm:text-base;
+  }
+  
+  .text-responsive-lg {
+    @apply text-base sm:text-lg;
+  }
+  
+  /* Estilos para botões com estados melhorados */
+  .btn-primary-hover {
+    @apply hover:bg-primary/90 active:bg-primary/80 transition-colors duration-200;
+  }
+  
+  .btn-secondary-hover {
+    @apply hover:bg-secondary/80 active:bg-secondary/70 transition-colors duration-200;
+  }
+  
+  /* Estilos para inputs com foco melhorado */
+  .input-focus-ring {
+    @apply focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-200;
+  }
+  
+  /* Estilos para cards com hover states */
+  .card-hover {
+    @apply hover:shadow-md hover:border-primary/30 transition-all duration-200;
+  }
+  
+  /* Estilos para badges com animações */
+  .badge-animate {
+    @apply transition-all duration-200 hover:scale-105;
+  }
+  
+  /* Estilos para loading states */
+  .loading-shimmer {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+  
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+  
+  /* Estilos para scrollbars personalizadas */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: rgba(156, 163, 175, 0.5);
+    border-radius: 3px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(156, 163, 175, 0.7);
   }
 }
