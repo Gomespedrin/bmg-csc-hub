@@ -32,7 +32,11 @@ const Index = () => {
     tempoMedio: servico.tempo_medio ? `${Math.ceil(servico.tempo_medio / 60)} dias` : '1 dia',
     sla: servico.sla ? `${servico.sla} horas` : '24 horas',
     status: (servico.status === 'ativo' ? 'Ativo' : 'Inativo') as "Ativo" | "Inativo",
-    demandaRotina: (servico.demanda_rotina as "Demanda" | "Rotina") || 'Demanda'
+    demandaRotina: (servico.demanda_rotina as "Demanda" | "Rotina") || 'Demanda',
+    sistemaExistente: servico.sistema_existente,
+    statusAutomatizacao: servico.status_automatizacao,
+    statusValidacao: servico.status_validacao,
+    linkSolicitacao: servico.link_solicitacao
   }));
 
   const featuredServicos = formattedServicos.slice(0, 2);

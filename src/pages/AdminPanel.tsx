@@ -3,8 +3,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useSugestoes, useUpdateSugestao } from "@/hooks/useSugestoes";
-import { useIsAdmin, useAdminAreas, useAdminProcessos, useAdminSubprocessos, useAdminServicos, useCreateArea, useUpdateArea, useDeleteArea, useCreateProcesso, useUpdateProcesso, useDeleteProcesso, useCreateSubprocesso, useUpdateSubprocesso, useDeleteSubprocesso, useCreateServico, useUpdateServico, useDeleteServico, useAdminUsers } from "@/hooks/useAdmin";
+import { useIsAdmin, useAdminAreas, useAdminProcessos, useAdminSubprocessos, useAdminServicos, useCreateArea, useUpdateArea, useDeleteArea, useCreateProcesso, useUpdateProcesso, useDeleteProcesso, useCreateSubprocesso, useUpdateSubprocesso, useDeleteSubprocesso, useCreateServico, useUpdateServico, useDeleteServico, useAdminUsers, useAnexos, useUploadAnexo, useDeleteAnexo } from "@/hooks/useAdmin";
 import { useAreas } from "@/hooks/useAreas";
+import { useServicos } from "@/hooks/useServicos";
+import { useFAQ } from "@/hooks/useFAQ";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -19,6 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ViewOptions, ViewMode } from "@/components/ui/view-options";
+import { FileUpload } from "@/components/ui/file-upload";
 import { 
   Users, 
   Settings, 
@@ -46,7 +49,13 @@ import {
   Target,
   Globe,
   Bell,
-  Database
+  Database,
+  Zap,
+  Tag,
+  Eye,
+  CalendarIcon,
+  Building,
+  ArrowLeft
 } from "lucide-react";
 
 type AdminModule = 'usuarios' | 'avaliar-sugestoes' | 'editar-catalogo' | 'faq' | 'configuracoes' | 'auditoria';
@@ -66,6 +75,7 @@ export default function AdminPanel() {
   const [comentarioAdmin, setComentarioAdmin] = useState('');
   const [justificativaRejeicao, setJustificativaRejeicao] = useState('');
   const [selectedSugestao, setSelectedSugestao] = useState<any>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
@@ -98,6 +108,12 @@ export default function AdminPanel() {
   const { data: processos, isLoading: processosLoading } = useAdminProcessos();
   const { data: subprocessos, isLoading: subprocessosLoading } = useAdminSubprocessos();
   const { data: servicos, isLoading: servicosLoading } = useAdminServicos();
+  const { data: faqs, isLoading: faqsLoading } = useFAQ();
+  
+  // Hooks para anexos
+  const { data: anexos, isLoading: anexosLoading } = useAnexos();
+  const uploadAnexo = useUploadAnexo();
+  const deleteAnexo = useDeleteAnexo();
   const { data: areasForSelect } = useAreas();
 
   // Hooks para mutações do catálogo
@@ -271,6 +287,12 @@ export default function AdminPanel() {
     console.log('🔍 handleEdit - item:', item);
     console.log('🔍 handleEdit - formDataToSet:', formDataToSet);
     console.log('🔍 handleEdit - catalogoModule:', catalogoModule);
+    console.log('🔍 handleEdit - campos específicos:', {
+      link_solicitacao: formDataToSet.link_solicitacao,
+      status_automatizacao: formDataToSet.status_automatizacao,
+      status_validacao: formDataToSet.status_validacao,
+      sistema_existente: formDataToSet.sistema_existente
+    });
     
     setFormData(formDataToSet);
     setIsEditDialogOpen(true);
@@ -428,12 +450,30 @@ export default function AdminPanel() {
 
   // Funções para catálogo
   const getCatalogoData = () => {
+    console.log('getCatalogoData - catalogoModule:', catalogoModule);
+    console.log('getCatalogoData - data lengths:', {
+      areas: areas?.length,
+      processos: processos?.length,
+      subprocessos: subprocessos?.length,
+      servicos: servicos?.length
+    });
+    
     switch (catalogoModule) {
-      case 'areas': return areas || [];
-      case 'processos': return processos || [];
-      case 'subprocessos': return subprocessos || [];
-      case 'servicos': return servicos || [];
-      default: return [];
+      case 'areas': 
+        console.log('getCatalogoData - returning areas:', areas?.length);
+        return areas || [];
+      case 'processos': 
+        console.log('getCatalogoData - returning processos:', processos?.length);
+        return processos || [];
+      case 'subprocessos': 
+        console.log('getCatalogoData - returning subprocessos:', subprocessos?.length);
+        return subprocessos || [];
+      case 'servicos': 
+        console.log('getCatalogoData - returning servicos:', servicos?.length);
+        return servicos || [];
+      default: 
+        console.log('getCatalogoData - default: empty array');
+        return [];
     }
   };
 
@@ -477,6 +517,32 @@ export default function AdminPanel() {
     }
   };
 
+  // Funções para anexos
+  const handleFileUpload = async (file: File) => {
+    if (!selectedItem?.id) {
+      toast({
+        title: "Erro",
+        description: "Nenhum serviço selecionado para anexar arquivo.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await uploadAnexo.mutateAsync({ servicoId: selectedItem.id, file });
+    } catch (error) {
+      console.error('Erro ao fazer upload:', error);
+    }
+  };
+
+  const handleFileDelete = async (fileId: string) => {
+    try {
+      await deleteAnexo.mutateAsync(fileId);
+    } catch (error) {
+      console.error('Erro ao deletar arquivo:', error);
+    }
+  };
+
   const handleCatalogoSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -498,6 +564,9 @@ export default function AdminPanel() {
       }
       
       console.log('🔍 handleCatalogoSubmit - cleanFormData:', cleanFormData);
+      console.log('🔍 handleCatalogoSubmit - isCreateDialogOpen:', isCreateDialogOpen);
+      console.log('🔍 handleCatalogoSubmit - catalogoModule:', catalogoModule);
+      console.log('🔍 handleCatalogoSubmit - selectedItem:', selectedItem);
       
       let result;
       
@@ -530,12 +599,16 @@ export default function AdminPanel() {
             result = await updateSubprocesso.mutateAsync({ id: selectedItem.id, ...cleanFormData });
             break;
           case 'servicos':
+            console.log('🔍 handleCatalogoSubmit - chamando updateServico com:', { id: selectedItem.id, ...cleanFormData });
             result = await updateServico.mutateAsync({ id: selectedItem.id, ...cleanFormData });
+            console.log('🔍 handleCatalogoSubmit - resultado updateServico:', result);
             break;
           default:
             throw new Error('Módulo de catálogo não reconhecido');
         }
       }
+      
+      console.log('🔍 handleCatalogoSubmit - resultado final:', result);
       
       // Invalidar todas as queries relacionadas
       const queriesToInvalidate = [
@@ -555,9 +628,10 @@ export default function AdminPanel() {
       
       toast({
         title: "Sucesso",
-        description: `Item ${isCreateDialogOpen ? 'criado' : 'atualizado'} com sucesso.`,
+        description: `${getCatalogoTitle().slice(0, -1)} ${isCreateDialogOpen ? 'criado' : 'atualizado'} com sucesso.`,
       });
     } catch (error) {
+      console.error('🔍 handleCatalogoSubmit - erro:', error);
       toast({
         title: "Erro",
         description: `Erro ao salvar o item: ${error instanceof Error ? error.message : 'Erro desconhecido'}`,
@@ -567,13 +641,28 @@ export default function AdminPanel() {
   };
 
   const getModuleData = () => {
+    console.log('getModuleData - activeModule:', activeModule);
+    
     switch (activeModule) {
-      case 'usuarios': return users || [];
-      case 'avaliar-sugestoes': return sugestoes || [];
-      case 'editar-catalogo': return getCatalogoData();
-      case 'faq': return mockFAQ;
-      case 'auditoria': return mockAuditoria;
-      default: return [];
+      case 'usuarios': 
+        console.log('getModuleData - usuarios:', users?.length);
+        return users || [];
+      case 'avaliar-sugestoes': 
+        console.log('getModuleData - sugestoes:', sugestoes?.length);
+        return sugestoes || [];
+      case 'editar-catalogo': 
+        const catalogoData = getCatalogoData();
+        console.log('getModuleData - catalogoData:', catalogoData?.length);
+        return catalogoData;
+      case 'faq': 
+        console.log('getModuleData - faqs:', mockFAQ?.length);
+        return mockFAQ;
+      case 'auditoria': 
+        console.log('getModuleData - auditoria:', mockAuditoria?.length);
+        return mockAuditoria;
+      default: 
+        console.log('getModuleData - default: empty array');
+        return [];
     }
   };
 
@@ -708,6 +797,12 @@ export default function AdminPanel() {
 
       return (
         <div className="space-y-6">
+          {/* INDICADOR DE NOVA VERSÃO */}
+          <div className="bg-red-500 text-white p-4 rounded-lg text-center">
+            <h2 className="text-xl font-bold">🚀 NOVA VERSÃO ATIVA!</h2>
+            <p>Se você está vendo esta mensagem, as mudanças foram aplicadas com sucesso!</p>
+          </div>
+
           {/* Estatísticas */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <Card>
@@ -767,60 +862,92 @@ export default function AdminPanel() {
             </Card>
           </div>
 
-          {/* Lista de Sugestões */}
+          {/* Lista de Sugestões - NOVA VERSÃO */}
           <div className="space-y-4">
-            {data.map((sugestao) => (
-              <Card key={sugestao.id} className="hover:shadow-md transition-shadow">
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-1">
-                      <CardTitle className="text-xl">
-                        {sugestao.dados_sugeridos?.produto || 'Nova Sugestão'}
-                      </CardTitle>
-                      <CardDescription>
-                        Área: {sugestao.dados_sugeridos?.area} • Tipo: {sugestao.tipo} • 
-                        Criado em: {formatDate(sugestao.created_at)}
-                      </CardDescription>
-                      <p className="text-sm text-muted-foreground mt-2">
-                        {sugestao.justificativa}
-                      </p>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      {getStatusBadge(sugestao.status)}
-                      <div className="flex space-x-1">
-                        {sugestao.status === 'pendente' && (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleApprove(sugestao.id)}
-                              className="text-green-600 hover:text-green-700"
-                            >
-                              <CheckCircle className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleReject(sugestao.id)}
-                              className="text-red-600 hover:text-red-700"
-                            >
-                              <XCircle className="h-4 w-4" />
-                            </Button>
-                          </>
-                        )}
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleEdit(sugestao)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </CardHeader>
+            {data.length === 0 ? (
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-500">Nenhuma sugestão encontrada.</p>
+                </CardContent>
               </Card>
-            ))}
+            ) : (
+              <div className="grid gap-4">
+                {data.map((sugestao: any) => (
+                  <Card 
+                    key={sugestao.id} 
+                    className={`hover:shadow-lg transition-all duration-200 cursor-pointer ${
+                      sugestao.status === 'pendente' ? 'border-l-4 border-l-yellow-500 bg-yellow-50/30' : ''
+                    }`}
+                    onClick={() => {
+                      console.log('🔍 Clicou na sugestão:', sugestao.id);
+                      setSelectedSugestao(sugestao);
+                      setIsModalOpen(true);
+                    }}
+                  >
+                    <CardContent className="p-6">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 space-y-3">
+                          <div className="flex items-center space-x-3">
+                            <div className="flex items-center space-x-2">
+                              {getStatusIcon(sugestao.status)}
+                              {getStatusBadge(sugestao.status)}
+                            </div>
+                            {sugestao.status === 'pendente' && (
+                              <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
+                                <AlertCircle className="h-3 w-3 mr-1" />
+                                Aguardando Avaliação
+                              </Badge>
+                            )}
+                          </div>
+                          
+                          <div>
+                            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                              {sugestao.dados_sugeridos?.produto || 'Sugestão'}
+                            </h3>
+                            <p className="text-sm text-gray-600 line-clamp-2">
+                              {sugestao.dados_sugeridos?.oQueE || sugestao.justificativa}
+                            </p>
+                          </div>
+                          
+                          <div className="flex items-center space-x-4 text-xs text-gray-500">
+                            <span className="flex items-center">
+                              <Tag className="h-3 w-3 mr-1" />
+                              {sugestao.tipo === 'novo' ? 'Novo Serviço' : 'Edição'}
+                            </span>
+                            <span className="flex items-center">
+                              <Building className="h-3 w-3 mr-1" />
+                              {sugestao.dados_sugeridos?.area || 'Não informado'}
+                            </span>
+                            <span className="flex items-center">
+                              <CalendarIcon className="h-3 w-3 mr-1" />
+                              {formatDate(sugestao.created_at)}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center space-x-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="flex items-center space-x-2"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              console.log('🔍 Clicou no botão Ver Detalhes');
+                              setSelectedSugestao(sugestao);
+                              setIsModalOpen(true);
+                            }}
+                          >
+                            <Eye className="h-4 w-4" />
+                            <span>Ver Detalhes</span>
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       );
@@ -829,6 +956,24 @@ export default function AdminPanel() {
     if (activeModule === 'editar-catalogo') {
       const data = getFilteredData();
       const isLoading = areasLoading || processosLoading || subprocessosLoading || servicosLoading;
+
+      console.log('AdminPanel - editar-catalogo:', {
+        isLoading,
+        areasLoading,
+        processosLoading,
+        subprocessosLoading,
+        servicosLoading,
+        dataLength: data?.length,
+        catalogoModule
+      });
+
+      if (isLoading) {
+        return (
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+          </div>
+        );
+      }
 
       return (
         <div className="space-y-6">
@@ -1141,6 +1286,18 @@ export default function AdminPanel() {
                           <div className="flex items-center space-x-2">
                             <Target className="h-4 w-4 text-muted-foreground" />
                             <span className="truncate">{item.sla ? `${item.sla}h` : 'Não informado'}</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <FileText className="h-4 w-4 text-muted-foreground" />
+                            <span className="truncate">{item.sistema_existente || 'Não informado'}</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Zap className="h-4 w-4 text-muted-foreground" />
+                            <span className="truncate">{item.status_automatizacao || 'Não informado'}</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <CheckCircle className="h-4 w-4 text-muted-foreground" />
+                            <span className="truncate">{item.status_validacao || 'Pendente'}</span>
                           </div>
                         </div>
                       </CardContent>
@@ -1516,6 +1673,25 @@ export default function AdminPanel() {
         </div>
       </div>
     );
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'pendente':
+        return <Clock className="h-4 w-4 text-yellow-600" />;
+      case 'aprovada':
+        return <CheckCircle className="h-4 w-4 text-green-600" />;
+      case 'rejeitada':
+        return <XCircle className="h-4 w-4 text-red-600" />;
+      default:
+        return <AlertCircle className="h-4 w-4 text-gray-600" />;
+    }
+  };
+
+  const closeModal = () => {
+    console.log('🔍 Fechando modal');
+    setIsModalOpen(false);
+    setSelectedSugestao(null);
   };
 
   return (
@@ -1993,7 +2169,22 @@ export default function AdminPanel() {
                                 value={formData.requisitos_operacionais || ''}
                                 onChange={(e) => setFormData({ ...formData, requisitos_operacionais: e.target.value })}
                                 placeholder="Descreva os requisitos operacionais..."
+                                rows={3}
                               />
+                              
+                              {/* Upload de Anexos */}
+                              {catalogoModule === 'servicos' && selectedItem?.id && (
+                                <div className="mt-4">
+                                  <Label>Anexar Arquivos</Label>
+                                  <FileUpload
+                                    servicoId={selectedItem.id}
+                                    onFileUpload={handleFileUpload}
+                                    onFileDelete={handleFileDelete}
+                                    files={anexos || []}
+                                    disabled={uploadAnexo.isPending || deleteAnexo.isPending}
+                                  />
+                                </div>
+                              )}
                             </div>
                             <div>
                               <Label htmlFor="observacoes">Observações</Label>
@@ -2019,6 +2210,60 @@ export default function AdminPanel() {
                                   <SelectItem value="ambos">Ambos</SelectItem>
                                 </SelectContent>
                               </Select>
+                            </div>
+                            
+                            {/* Novos campos operacionais */}
+                            <div>
+                              <Label htmlFor="sistema_existente">Está em algum sistema?</Label>
+                              <Input
+                                id="sistema_existente"
+                                value={formData.sistema_existente || ''}
+                                onChange={(e) => setFormData({ ...formData, sistema_existente: e.target.value })}
+                                placeholder="Ex: ERP Senior, Planilha, Zeev BPMS, Zeev Docs, Espresso, Alcis, Voll, Intranet"
+                              />
+                            </div>
+                            
+                            <div>
+                              <Label htmlFor="status_automatizacao">Status de Automação</Label>
+                              <Select
+                                value={formData.status_automatizacao || ''}
+                                onValueChange={(value) => setFormData({ ...formData, status_automatizacao: value })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Selecione o status" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Manual">Manual</SelectItem>
+                                  <SelectItem value="Planejado">Planejado</SelectItem>
+                                  <SelectItem value="Automatizado">Automatizado</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            
+                            <div>
+                              <Label htmlFor="status_validacao">Status de Validação pela Área</Label>
+                              <Select
+                                value={formData.status_validacao || 'Pendente'}
+                                onValueChange={(value) => setFormData({ ...formData, status_validacao: value })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Selecione o status" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Pendente">Pendente</SelectItem>
+                                  <SelectItem value="Validado">Validado</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            
+                            <div>
+                              <Label htmlFor="link_solicitacao">Link ou caminho onde solicitar</Label>
+                              <Input
+                                id="link_solicitacao"
+                                value={formData.link_solicitacao || ''}
+                                onChange={(e) => setFormData({ ...formData, link_solicitacao: e.target.value })}
+                                placeholder="URL clicável ou caminho no sistema/intranet"
+                              />
                             </div>
                           </>
                         )}
@@ -2113,6 +2358,206 @@ export default function AdminPanel() {
                   </Button>
                 </DialogFooter>
               </form>
+            </DialogContent>
+          </Dialog>
+
+          {/* Modal para Detalhes da Sugestão */}
+          <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto z-[9999]">
+              {selectedSugestao && (
+                <>
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center space-x-3">
+                      <Button variant="ghost" size="sm" onClick={closeModal} className="p-0 h-auto">
+                        <ArrowLeft className="h-4 w-4" />
+                      </Button>
+                      <div>
+                        <h2 className="text-xl font-bold">
+                          {(selectedSugestao.dados_sugeridos as any)?.produto || 'Sugestão'}
+                        </h2>
+                        <div className="flex items-center space-x-2 mt-2">
+                          {getStatusBadge(selectedSugestao.status)}
+                          <span className="text-sm text-gray-500">
+                            Criado em {formatDate(selectedSugestao.created_at)}
+                          </span>
+                        </div>
+                      </div>
+                    </DialogTitle>
+                  </DialogHeader>
+
+                  <div className="space-y-6">
+                    {/* Informações Gerais */}
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold">Informações Gerais</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-sm font-medium">Tipo</Label>
+                          <p className="text-sm text-gray-600">
+                            {selectedSugestao.tipo === 'novo' ? 'Novo Serviço' : 'Edição de Serviço'}
+                          </p>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium">Status</Label>
+                          <div className="flex items-center space-x-2">
+                            {getStatusIcon(selectedSugestao.status)}
+                            {getStatusBadge(selectedSugestao.status)}
+                          </div>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium">Usuário</Label>
+                          <p className="text-sm text-gray-600">
+                            {selectedSugestao.user_email || 'Não informado'}
+                          </p>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium">Data de Criação</Label>
+                          <p className="text-sm text-gray-600">
+                            {formatDate(selectedSugestao.created_at)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Dados Sugeridos */}
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold">Dados Sugeridos</h3>
+                      <div className="bg-gray-50 p-4 rounded-lg">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {(selectedSugestao.dados_sugeridos as any)?.produto && (
+                            <div>
+                              <Label className="text-sm font-medium">Produto/Serviço</Label>
+                              <p className="text-sm text-gray-600">
+                                {(selectedSugestao.dados_sugeridos as any).produto}
+                              </p>
+                            </div>
+                          )}
+                          {(selectedSugestao.dados_sugeridos as any)?.oQueE && (
+                            <div>
+                              <Label className="text-sm font-medium">O que é</Label>
+                              <p className="text-sm text-gray-600">
+                                {(selectedSugestao.dados_sugeridos as any).oQueE}
+                              </p>
+                            </div>
+                          )}
+                          {(selectedSugestao.dados_sugeridos as any)?.area && (
+                            <div>
+                              <Label className="text-sm font-medium">Área</Label>
+                              <p className="text-sm text-gray-600">
+                                {(selectedSugestao.dados_sugeridos as any).area}
+                              </p>
+                            </div>
+                          )}
+                          {(selectedSugestao.dados_sugeridos as any)?.processo && (
+                            <div>
+                              <Label className="text-sm font-medium">Processo</Label>
+                              <p className="text-sm text-gray-600">
+                                {(selectedSugestao.dados_sugeridos as any).processo}
+                              </p>
+                            </div>
+                          )}
+                          {(selectedSugestao.dados_sugeridos as any)?.subprocesso && (
+                            <div>
+                              <Label className="text-sm font-medium">Subprocesso</Label>
+                              <p className="text-sm text-gray-600">
+                                {(selectedSugestao.dados_sugeridos as any).subprocesso}
+                              </p>
+                            </div>
+                          )}
+                          {(selectedSugestao.dados_sugeridos as any)?.comoAcessar && (
+                            <div>
+                              <Label className="text-sm font-medium">Como Acessar</Label>
+                              <p className="text-sm text-gray-600">
+                                {(selectedSugestao.dados_sugeridos as any).comoAcessar}
+                              </p>
+                            </div>
+                          )}
+                          {(selectedSugestao.dados_sugeridos as any)?.documentosNecessarios && (
+                            <div>
+                              <Label className="text-sm font-medium">Documentos Necessários</Label>
+                              <p className="text-sm text-gray-600">
+                                {(selectedSugestao.dados_sugeridos as any).documentosNecessarios}
+                              </p>
+                            </div>
+                          )}
+                          {(selectedSugestao.dados_sugeridos as any)?.prazo && (
+                            <div>
+                              <Label className="text-sm font-medium">Prazo</Label>
+                              <p className="text-sm text-gray-600">
+                                {(selectedSugestao.dados_sugeridos as any).prazo}
+                              </p>
+                            </div>
+                          )}
+                          {(selectedSugestao.dados_sugeridos as any)?.custo && (
+                            <div>
+                              <Label className="text-sm font-medium">Custo</Label>
+                              <p className="text-sm text-gray-600">
+                                {(selectedSugestao.dados_sugeridos as any).custo}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Justificativa */}
+                    {selectedSugestao.justificativa && (
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-semibold">Justificativa</h3>
+                        <div className="bg-blue-50 p-4 rounded-lg">
+                          <p className="text-sm text-gray-700">
+                            {selectedSugestao.justificativa}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Comentários do Admin */}
+                    {selectedSugestao.comentario_admin && (
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-semibold">Comentários do Administrador</h3>
+                        <div className="bg-yellow-50 p-4 rounded-lg">
+                          <p className="text-sm text-gray-700">
+                            {selectedSugestao.comentario_admin}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Ações */}
+                    {selectedSugestao.status === 'pendente' && (
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-semibold">Ações</h3>
+                        <div className="flex space-x-4">
+                          <Button
+                            onClick={() => handleApprove(selectedSugestao.id)}
+                            disabled={processingId === selectedSugestao.id}
+                            className="bg-green-600 hover:bg-green-700"
+                          >
+                            {processingId === selectedSugestao.id ? (
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                            ) : (
+                              <CheckCircle className="h-4 w-4 mr-2" />
+                            )}
+                            Aprovar
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            onClick={() => handleReject(selectedSugestao.id)}
+                            disabled={processingId === selectedSugestao.id}
+                          >
+                            {processingId === selectedSugestao.id ? (
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                            ) : (
+                              <XCircle className="h-4 w-4 mr-2" />
+                            )}
+                            Rejeitar
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </DialogContent>
           </Dialog>
         </main>

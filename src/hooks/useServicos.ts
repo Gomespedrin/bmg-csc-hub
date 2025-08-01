@@ -16,6 +16,11 @@ export interface Servico {
   observacoes?: string;
   demanda_rotina?: string;
   status: string;
+  sistema_existente?: string;
+  status_automatizacao?: string;
+  data_ultima_validacao?: string;
+  status_validacao?: string;
+  link_solicitacao?: string;
   subprocesso: {
     id: string;
     nome: string;
@@ -88,6 +93,10 @@ export function useServicos(filters: FilterOptions = {}) {
           demanda_rotina,
           o_que_e,
           observacoes,
+          sistema_existente,
+          status_automatizacao,
+          status_validacao,
+          link_solicitacao,
           subprocesso:subprocessos!inner(
             id,
             nome,

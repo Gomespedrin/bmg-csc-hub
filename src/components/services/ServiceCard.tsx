@@ -18,6 +18,10 @@ interface ServiceCardProps {
     demandaRotina: "Demanda" | "Rotina";
     subprocessoId?: string;
     processoId?: string;
+    sistemaExistente?: string;
+    statusAutomatizacao?: string;
+    statusValidacao?: string;
+    linkSolicitacao?: string;
   };
 }
 
@@ -78,16 +82,44 @@ export function ServiceCard({ service }: ServiceCardProps) {
         </div>
 
         <div className="flex items-center justify-between pt-2">
-          <Badge 
-            variant="outline" 
-            className={`text-xs ${
-              service.demandaRotina === "Demanda" 
-                ? "border-orange-200 text-orange-700 bg-orange-50" 
-                : "border-blue-200 text-blue-700 bg-blue-50"
-            }`}
-          >
-            {service.demandaRotina}
-          </Badge>
+          <div className="flex items-center space-x-2">
+            <Badge 
+              variant="outline" 
+              className={`text-xs ${
+                service.demandaRotina === "Demanda" 
+                  ? "border-orange-200 text-orange-700 bg-orange-50" 
+                  : "border-blue-200 text-blue-700 bg-blue-50"
+              }`}
+            >
+              {service.demandaRotina}
+            </Badge>
+            {service.statusValidacao && (
+              <Badge 
+                variant="outline" 
+                className={`text-xs ${
+                  service.statusValidacao === "Validado" 
+                    ? "border-green-200 text-green-700 bg-green-50" 
+                    : "border-orange-200 text-orange-700 bg-orange-50"
+                }`}
+              >
+                {service.statusValidacao}
+              </Badge>
+            )}
+            {service.statusAutomatizacao && (
+              <Badge 
+                variant="outline" 
+                className={`text-xs ${
+                  service.statusAutomatizacao === "Automatizado" 
+                    ? "border-green-200 text-green-700 bg-green-50" 
+                    : service.statusAutomatizacao === "Planejado"
+                    ? "border-blue-200 text-blue-700 bg-blue-50"
+                    : "border-orange-200 text-orange-700 bg-orange-50"
+                }`}
+              >
+                {service.statusAutomatizacao}
+              </Badge>
+            )}
+          </div>
 
           <Button asChild variant="outline" size="sm" className="group/btn text-xs h-8">
             <Link to={servicoUrl}>

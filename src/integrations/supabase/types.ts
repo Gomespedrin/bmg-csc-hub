@@ -169,8 +169,10 @@ export type Database = {
           ativo: boolean
           created_at: string
           created_by: string | null
+          data_ultima_validacao: string | null
           demanda_rotina: string | null
           id: string
+          link_solicitacao: string | null
           o_que_e: string | null
           observacoes: string | null
           produto: string
@@ -179,7 +181,10 @@ export type Database = {
           sla: number | null
           sli: number | null
           status: string
+          status_automatizacao: string | null
+          status_validacao: string | null
           subprocesso_id: string
+          sistema_existente: string | null
           tempo_medio: number | null
           unidade_medida: string | null
           updated_at: string
@@ -190,8 +195,10 @@ export type Database = {
           ativo?: boolean
           created_at?: string
           created_by?: string | null
+          data_ultima_validacao?: string | null
           demanda_rotina?: string | null
           id?: string
+          link_solicitacao?: string | null
           o_que_e?: string | null
           observacoes?: string | null
           produto: string
@@ -200,7 +207,10 @@ export type Database = {
           sla?: number | null
           sli?: number | null
           status?: string
+          status_automatizacao?: string | null
+          status_validacao?: string | null
           subprocesso_id: string
+          sistema_existente?: string | null
           tempo_medio?: number | null
           unidade_medida?: string | null
           updated_at?: string
@@ -211,8 +221,10 @@ export type Database = {
           ativo?: boolean
           created_at?: string
           created_by?: string | null
+          data_ultima_validacao?: string | null
           demanda_rotina?: string | null
           id?: string
+          link_solicitacao?: string | null
           o_que_e?: string | null
           observacoes?: string | null
           produto?: string
@@ -221,7 +233,10 @@ export type Database = {
           sla?: number | null
           sli?: number | null
           status?: string
+          status_automatizacao?: string | null
+          status_validacao?: string | null
           subprocesso_id?: string
+          sistema_existente?: string | null
           tempo_medio?: number | null
           unidade_medida?: string | null
           updated_at?: string

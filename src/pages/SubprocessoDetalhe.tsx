@@ -107,7 +107,11 @@ export default function SubprocessoDetalhe() {
     tempoMedio: servico.tempo_medio ? `${Math.ceil(servico.tempo_medio / 60)} dias` : '1 dia',
     sla: servico.sla ? `${servico.sla} horas` : '24 horas',
     status: (servico.status === 'ativo' ? 'Ativo' : 'Inativo') as "Ativo" | "Inativo",
-    demandaRotina: (servico.demanda_rotina as "Demanda" | "Rotina") || 'Demanda'
+    demandaRotina: (servico.demanda_rotina as "Demanda" | "Rotina") || 'Demanda',
+    sistemaExistente: servico.sistema_existente,
+    statusAutomatizacao: servico.status_automatizacao,
+    statusValidacao: servico.status_validacao,
+    linkSolicitacao: servico.link_solicitacao
   }));
 
   return (
@@ -229,21 +233,35 @@ export default function SubprocessoDetalhe() {
                     </div>
                     
                     <div className="flex items-center space-x-3">
-                      <Badge 
-                        variant={servico.status === "Ativo" ? "default" : "secondary"}
-                        className={servico.status === "Ativo" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}
-                      >
-                        {servico.status}
-                      </Badge>
-                      <Badge 
-                        variant="outline" 
-                        className={`${servico.demandaRotina === "Demanda" 
-                          ? "border-warning text-warning" 
-                          : "border-accent text-accent"
-                        }`}
-                      >
-                        {servico.demandaRotina}
-                      </Badge>
+                      <div className="flex items-center space-x-2">
+                        <Badge 
+                          variant={servico.status === "Ativo" ? "default" : "secondary"}
+                          className={servico.status === "Ativo" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}
+                        >
+                          {servico.status}
+                        </Badge>
+                        <Badge 
+                          variant="outline" 
+                          className={`${servico.demandaRotina === "Demanda" 
+                            ? "border-warning text-warning" 
+                            : "border-accent text-accent"
+                          }`}
+                        >
+                          {servico.demandaRotina}
+                        </Badge>
+                        {servico.statusValidacao && (
+                          <Badge
+                            variant="outline"
+                            className={`${
+                              servico.statusValidacao === "Validado"
+                                ? "border-green-200 text-green-700 bg-green-50"
+                                : "border-orange-200 text-orange-700 bg-orange-50"
+                            }`}
+                          >
+                            {servico.statusValidacao}
+                          </Badge>
+                        )}
+                      </div>
                       <Button asChild variant="outline" size="sm">
                         <Link to={createServicoUrl(servico.produto, servico.id)}>
                           Ver detalhes

@@ -92,7 +92,11 @@ const Servicos = () => {
     status: (servico.status === 'ativo' ? 'Ativo' : 'Inativo') as "Ativo" | "Inativo",
     demandaRotina: (servico.demanda_rotina as "Demanda" | "Rotina") || 'Demanda',
     subprocessoId: servico.subprocesso.id,
-    processoId: servico.subprocesso.processo.id
+    processoId: servico.subprocesso.processo.id,
+    sistemaExistente: servico.sistema_existente,
+    statusAutomatizacao: servico.status_automatizacao,
+    statusValidacao: servico.status_validacao,
+    linkSolicitacao: servico.link_solicitacao
   }));
 
   // Estatísticas

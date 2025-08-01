@@ -445,7 +445,13 @@ export const useCreateServico = () => {
       observacoes?: string;
       demanda_rotina?: string;
       subprocesso_id: string;
+      sistema_existente?: string;
+      status_automatizacao?: string;
+      status_validacao?: string;
+      link_solicitacao?: string;
     }) => {
+      console.log('🔍 useCreateServico - dados recebidos:', servico);
+      
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuário não autenticado');
 
@@ -459,7 +465,14 @@ export const useCreateServico = () => {
         .select()
         .single();
 
-      if (error) throw error;
+      console.log('🔍 useCreateServico - resposta do Supabase:', { data, error });
+
+      if (error) {
+        console.error('🔍 useCreateServico - erro do Supabase:', error);
+        throw error;
+      }
+      
+      console.log('🔍 useCreateServico - sucesso:', data);
       return data;
     },
     onSuccess: () => {
@@ -501,7 +514,13 @@ export const useUpdateServico = () => {
       subprocesso_id?: string;
       status?: string;
       ativo?: boolean;
+      sistema_existente?: string;
+      status_automatizacao?: string;
+      status_validacao?: string;
+      link_solicitacao?: string;
     }) => {
+      console.log('🔍 useUpdateServico - dados recebidos:', { id, ...servico });
+      
       const { data, error } = await supabase
         .from('servicos')
         .update(servico)
@@ -509,7 +528,14 @@ export const useUpdateServico = () => {
         .select()
         .single();
 
-      if (error) throw error;
+      console.log('🔍 useUpdateServico - resposta do Supabase:', { data, error });
+
+      if (error) {
+        console.error('🔍 useUpdateServico - erro do Supabase:', error);
+        throw error;
+      }
+      
+      console.log('🔍 useUpdateServico - sucesso:', data);
       return data;
     },
     onSuccess: () => {
@@ -883,6 +909,170 @@ export const useUpdateConfiguracoes = () => {
       toast({
         title: "Erro",
         description: "Erro ao atualizar configurações. Verifique se você está logado como administrador.",
+        variant: "destructive"
+      });
+    },
+  });
+};
+
+// Hooks para Anexos
+export const useAnexos = (servicoId?: string) => {
+  return useQuery({
+    queryKey: ['anexos', servicoId],
+    queryFn: async () => {
+      console.log('🔍 useAnexos - Buscando anexos para servicoId:', servicoId);
+      
+      if (!servicoId) {
+        console.log('🔍 useAnexos - servicoId não fornecido, retornando array vazio');
+        return [];
+      }
+      
+      const { data, error } = await supabase
+        .from('anexos')
+        .select('*')
+        .eq('servico_id', servicoId)
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('🔍 useAnexos - Erro ao buscar anexos:', error);
+        throw error;
+      }
+      
+      console.log('🔍 useAnexos - Anexos encontrados:', data);
+      return data;
+    },
+    enabled: !!servicoId,
+  });
+};
+
+export const useUploadAnexo = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  
+  return useMutation({
+    mutationFn: async ({ servicoId, file }: { servicoId: string; file: File }) => {
+      console.log('🔍 useUploadAnexo - Iniciando upload:', { servicoId, fileName: file.name, fileSize: file.size });
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('🔍 useUploadAnexo - Usuário não autenticado');
+        throw new Error('Usuário não autenticado');
+      }
+      console.log('🔍 useUploadAnexo - Usuário autenticado:', user.id);
+
+      // Upload do arquivo para o storage
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}.${fileExt}`;
+      const filePath = `anexos/${servicoId}/${fileName}`;
+      
+      console.log('🔍 useUploadAnexo - Preparando upload para:', filePath);
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('anexos')
+        .upload(filePath, file);
+
+      if (uploadError) {
+        console.error('🔍 useUploadAnexo - Erro no upload:', uploadError);
+        throw uploadError;
+      }
+      
+      console.log('🔍 useUploadAnexo - Upload bem-sucedido:', uploadData);
+
+      // Obter URL pública do arquivo
+      const { data: urlData } = supabase.storage
+        .from('anexos')
+        .getPublicUrl(filePath);
+      
+      console.log('🔍 useUploadAnexo - URL pública:', urlData.publicUrl);
+
+      // Salvar referência no banco
+      const anexoData = {
+        servico_id: servicoId,
+        nome: file.name,
+        url: urlData.publicUrl,
+        tipo: file.type,
+        tamanho: file.size,
+      };
+      
+      console.log('🔍 useUploadAnexo - Salvando no banco:', anexoData);
+
+      const { data, error } = await supabase
+        .from('anexos')
+        .insert(anexoData)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('🔍 useUploadAnexo - Erro ao salvar no banco:', error);
+        throw error;
+      }
+      
+      console.log('🔍 useUploadAnexo - Anexo salvo com sucesso:', data);
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['anexos', data.servico_id] });
+      toast({
+        title: "Anexo enviado",
+        description: "O arquivo foi anexado com sucesso.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Erro",
+        description: "Erro ao enviar anexo. Verifique se o arquivo é válido.",
+        variant: "destructive"
+      });
+    },
+  });
+};
+
+export const useDeleteAnexo = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  
+  return useMutation({
+    mutationFn: async (anexoId: string) => {
+      // Buscar informações do anexo
+      const { data: anexo, error: fetchError } = await supabase
+        .from('anexos')
+        .select('*')
+        .eq('id', anexoId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Deletar do storage
+      const filePath = anexo.url.split('/').pop();
+      if (filePath) {
+        const { error: storageError } = await supabase.storage
+          .from('anexos')
+          .remove([`anexos/${anexo.servico_id}/${filePath}`]);
+
+        if (storageError) {
+          console.warn('Erro ao deletar arquivo do storage:', storageError);
+        }
+      }
+
+      // Deletar do banco
+      const { error } = await supabase
+        .from('anexos')
+        .delete()
+        .eq('id', anexoId);
+
+      if (error) throw error;
+    },
+    onSuccess: (_, anexoId) => {
+      queryClient.invalidateQueries({ queryKey: ['anexos'] });
+      toast({
+        title: "Anexo removido",
+        description: "O arquivo foi removido com sucesso.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Erro",
+        description: "Erro ao remover anexo.",
         variant: "destructive"
       });
     },

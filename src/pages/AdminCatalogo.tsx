@@ -526,6 +526,18 @@ export default function AdminCatalogo() {
                 <Target className="h-4 w-4 text-muted-foreground" />
                 <span>{item.sla ? `${item.sla}h` : 'Não informado'}</span>
               </div>
+              <div className="flex items-center space-x-2">
+                <FileText className="h-4 w-4 text-muted-foreground" />
+                <span>{item.sistema_existente || 'Não informado'}</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Zap className="h-4 w-4 text-muted-foreground" />
+                <span>{item.status_automatizacao || 'Não informado'}</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <CheckCircle className="h-4 w-4 text-muted-foreground" />
+                <span>{item.status_validacao || 'Pendente'}</span>
+              </div>
             </div>
           </CardContent>
         )}
@@ -1071,6 +1083,60 @@ export default function AdminCatalogo() {
                             id="observacoes"
                             value={formData.observacoes || ''}
                             onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
+                          />
+                        </div>
+                        
+                        {/* Novos campos operacionais */}
+                        <div>
+                          <Label htmlFor="sistema_existente">Está em algum sistema?</Label>
+                          <Input
+                            id="sistema_existente"
+                            value={formData.sistema_existente || ''}
+                            onChange={(e) => setFormData({ ...formData, sistema_existente: e.target.value })}
+                            placeholder="Ex: ERP Senior, Planilha, Zeev BPMS, Zeev Docs, Espresso, Alcis, Voll, Intranet"
+                          />
+                        </div>
+                        
+                        <div>
+                          <Label htmlFor="status_automatizacao">Status de Automação</Label>
+                          <Select
+                            value={formData.status_automatizacao || ''}
+                            onValueChange={(value) => setFormData({ ...formData, status_automatizacao: value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione o status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Manual">Manual</SelectItem>
+                              <SelectItem value="Planejado">Planejado</SelectItem>
+                              <SelectItem value="Automatizado">Automatizado</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        <div>
+                          <Label htmlFor="status_validacao">Status de Validação pela Área</Label>
+                          <Select
+                            value={formData.status_validacao || 'Pendente'}
+                            onValueChange={(value) => setFormData({ ...formData, status_validacao: value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione o status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Pendente">Pendente</SelectItem>
+                              <SelectItem value="Validado">Validado</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        <div>
+                          <Label htmlFor="link_solicitacao">Link ou caminho onde solicitar</Label>
+                          <Input
+                            id="link_solicitacao"
+                            value={formData.link_solicitacao || ''}
+                            onChange={(e) => setFormData({ ...formData, link_solicitacao: e.target.value })}
+                            placeholder="URL clicável ou caminho no sistema/intranet"
                           />
                         </div>
                       </>

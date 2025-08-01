@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Clock, Target, Users, FileText, AlertCircle, CheckCircle } from "lucide-react";
+import { ArrowLeft, Clock, Target, Users, FileText, AlertCircle, CheckCircle, Zap, Link as LinkIcon, Download, Paperclip } from "lucide-react";
 import { useServicoById } from "@/hooks/useServicos";
+import { useAnexos } from "@/hooks/useAdmin";
 import { extractIdFromSlug, createAreaUrl } from "@/lib/utils";
 import {
   Breadcrumb,
@@ -20,6 +21,7 @@ export default function ServicoDetalhe() {
   const { slug } = useParams();
   const servicoId = slug ? extractIdFromSlug(slug) : "";
   const { data: servico, isLoading, error } = useServicoById(servicoId);
+  const { data: anexos, isLoading: anexosLoading } = useAnexos(servicoId);
 
   if (isLoading) {
     return (
@@ -217,8 +219,129 @@ export default function ServicoDetalhe() {
                 <p className="text-muted-foreground leading-relaxed">
                   {servico.requisitos_operacionais || "Requisitos não especificados."}
                 </p>
+                {anexosLoading ? (
+                  <div className="text-center py-4">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
+                    <p className="mt-2 text-muted-foreground">Carregando anexos...</p>
+                  </div>
+                ) : anexos && anexos.length > 0 ? (
+                  <div className="mt-4 space-y-2">
+                    <h4 className="font-medium text-foreground">Anexos:</h4>
+                                         {anexos.map((anexo) => (
+                       <div key={anexo.id} className="flex items-center justify-between p-2 border rounded-lg">
+                         <div className="flex items-center space-x-2">
+                           <Paperclip className="h-4 w-4 text-muted-foreground" />
+                           <span className="text-sm font-medium">{anexo.nome}</span>
+                         </div>
+                         <Button
+                           variant="ghost"
+                           size="sm"
+                           onClick={() => window.open(anexo.url, '_blank')}
+                           className="h-8 w-8 p-0"
+                         >
+                           <Download className="h-4 w-4" />
+                         </Button>
+                       </div>
+                     ))}
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground">Nenhum anexo disponível.</p>
+                )}
               </CardContent>
             </Card>
+
+            {/* Sistema Existente */}
+            {servico.sistema_existente && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <FileText className="h-5 w-5" />
+                    <span>Está em algum sistema?</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground leading-relaxed">
+                    {servico.sistema_existente}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Status de Automação */}
+            {servico.status_automatizacao && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Zap className="h-5 w-5" />
+                    <span>Status Automação</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Badge 
+                    variant="outline" 
+                    className={`${
+                      servico.status_automatizacao === "Automatizado" 
+                        ? "border-green-200 text-green-700 bg-green-50" 
+                        : servico.status_automatizacao === "Planejado"
+                        ? "border-blue-200 text-blue-700 bg-blue-50"
+                        : "border-orange-200 text-orange-700 bg-orange-50"
+                    }`}
+                  >
+                    {servico.status_automatizacao}
+                  </Badge>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Status de Validação */}
+            {servico.status_validacao && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <CheckCircle className="h-5 w-5" />
+                    <span>Status de Validação pela Área</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <Badge 
+                      variant="outline" 
+                      className={`${
+                        servico.status_validacao === "Validado" 
+                          ? "border-green-200 text-green-700 bg-green-50" 
+                          : "border-orange-200 text-orange-700 bg-orange-50"
+                      }`}
+                    >
+                      {servico.status_validacao}
+                    </Badge>
+                    {servico.data_ultima_validacao && (
+                      <p className="text-sm text-muted-foreground">
+                        Última validação: {new Date(servico.data_ultima_validacao).toLocaleDateString('pt-BR')}
+                      </p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Link de Solicitação */}
+            {servico.link_solicitacao && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <LinkIcon className="h-5 w-5" />
+                    <span>Onde Solicitar</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Button asChild variant="outline" className="w-full">
+                    <a href={servico.link_solicitacao} target="_blank" rel="noopener noreferrer">
+                      Acessar Sistema
+                    </a>
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Observações */}
             {servico.observacoes && (

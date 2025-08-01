@@ -17,11 +17,11 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { useCreateSugestao } from "@/hooks/useSugestoes";
 import { useToast } from "@/hooks/use-toast";
 
-type SugestaoMode = "novo" | "edicao";
+type SugestaoMode = "criacao" | "edicao";
 type SugestaoScope = "area" | "processo" | "subprocesso" | "servico";
 
 interface FormData {
-  modo: "novo" | "edicao";
+  modo: "criacao" | "edicao";
   escopo: "area" | "processo" | "subprocesso" | "servico";
   areaId?: string;
   processoId?: string;
@@ -40,6 +40,11 @@ interface FormData {
   requisitos_operacionais?: string;
   observacoes?: string;
   quem_pode_utilizar?: string;
+  // Novos campos operacionais
+  sistema_existente?: string;
+  status_automatizacao?: string;
+  status_validacao?: string;
+  link_solicitacao?: string;
 }
 
 export default function NovaSugestao() {
@@ -51,7 +56,7 @@ export default function NovaSugestao() {
   const createSugestao = useCreateSugestao();
   
   const [form, setForm] = useState<FormData>({
-    modo: "novo",
+    modo: "criacao",
     escopo: "area",
     nome: "",
     descricao: "",
@@ -143,7 +148,11 @@ export default function NovaSugestao() {
             sli: servicoAtual.sli,
             demanda_rotina: servicoAtual.demanda_rotina,
             requisitos_operacionais: servicoAtual.requisitos_operacionais,
-            observacoes: servicoAtual.observacoes
+            observacoes: servicoAtual.observacoes,
+            sistema_existente: servicoAtual.sistema_existente,
+            status_automatizacao: servicoAtual.status_automatizacao,
+            status_validacao: servicoAtual.status_validacao,
+            link_solicitacao: servicoAtual.link_solicitacao
           }
         }));
       }
@@ -174,7 +183,7 @@ export default function NovaSugestao() {
       const servicoInfo = servicos.find(s => s.id === form.servicoId);
 
       const sugestaoData = {
-        tipo: form.modo === "novo" ? "novo" : "edicao",
+        tipo: form.modo === "criacao" ? "novo" : "edicao",
         modo: form.modo,
         dados_sugeridos: {
           modo: form.modo,
@@ -192,7 +201,21 @@ export default function NovaSugestao() {
           servico: servicoInfo?.nome || '',
           produto: form.nome, // Para compatibilidade com a exibição
           oQueE: form.descricao, // Para compatibilidade com a exibição
-          dados_atuais: form.dadosAtuais
+          dados_atuais: form.dadosAtuais,
+          // Novos campos operacionais
+          sistema_existente: form.sistema_existente,
+          status_automatizacao: form.status_automatizacao,
+          status_validacao: form.status_validacao,
+          link_solicitacao: form.link_solicitacao,
+          // Campos avançados para serviços
+          tempo_medio: form.tempo_medio,
+          unidade_medida: form.unidade_medida,
+          sla: form.sla,
+          sli: form.sli,
+          demanda_rotina: form.demanda_rotina,
+          requisitos_operacionais: form.requisitos_operacionais,
+          observacoes: form.observacoes,
+          quem_pode_utilizar: form.quem_pode_utilizar
         },
         dados_atuais: form.dadosAtuais || {},
         justificativa: form.justificativa
@@ -288,7 +311,7 @@ export default function NovaSugestao() {
       String(form[field as keyof FormData]).trim() !== ""
     );
 
-    if (form.modo === "novo") {
+    if (form.modo === "criacao") {
       // Para criação, verificar hierarquia baseada no escopo
       let hasRequiredHierarchy = true;
       
@@ -307,15 +330,6 @@ export default function NovaSugestao() {
       }
       
       const isValid = hasRequiredFields && hasRequiredHierarchy;
-      console.log("isFormValid - Criação:", { 
-        hasRequiredFields, 
-        hasRequiredHierarchy, 
-        isValid,
-        escopo: form.escopo,
-        areaId: form.areaId,
-        processoId: form.processoId,
-        subprocessoId: form.subprocessoId
-      });
       return isValid;
     } else {
       // Para edição, verificar se o item-alvo foi selecionado baseado no escopo
@@ -332,7 +346,6 @@ export default function NovaSugestao() {
       }
       
       const isValid = hasRequiredFields && hasTargetItem;
-      console.log("isFormValid - Edição:", { hasRequiredFields, hasTargetItem, isValid });
       return isValid;
     }
   };
@@ -811,6 +824,21 @@ export default function NovaSugestao() {
                                  <span className="font-medium text-black">Tipo de demanda:</span> {form.dadosAtuais.demanda_rotina}
                                </div>
                              )}
+                             {form.escopo === "servico" && form.dadosAtuais.sistema_existente && (
+                               <div>
+                                 <span className="font-medium text-black">Sistema:</span> {form.dadosAtuais.sistema_existente}
+                               </div>
+                             )}
+                             {form.escopo === "servico" && form.dadosAtuais.status_automatizacao && (
+                               <div>
+                                 <span className="font-medium text-black">Status de automação:</span> {form.dadosAtuais.status_automatizacao}
+                               </div>
+                             )}
+                             {form.escopo === "servico" && form.dadosAtuais.status_validacao && (
+                               <div>
+                                 <span className="font-medium text-black">Status de validação:</span> {form.dadosAtuais.status_validacao}
+                               </div>
+                             )}
                            </div>
                          </CardContent>
                        </Card>
@@ -911,6 +939,62 @@ export default function NovaSugestao() {
                            className="text-black"
                          />
                        </div>
+                       
+                       {/* Novos campos operacionais */}
+                       <div>
+                         <Label htmlFor="sistema_existente">Está em algum sistema?</Label>
+                         <Input
+                           id="sistema_existente"
+                           value={form.sistema_existente || ''}
+                           onChange={(e) => setForm(prev => ({ ...prev, sistema_existente: e.target.value }))}
+                           placeholder="Ex: ERP Senior, Planilha, Zeev BPMS, Zeev Docs, Espresso, Alcis, Voll, Intranet"
+                           className="text-black"
+                         />
+                       </div>
+                       
+                       <div>
+                         <Label htmlFor="status_automatizacao">Status de Automação</Label>
+                         <Select
+                           value={form.status_automatizacao || ''}
+                           onValueChange={(value) => setForm(prev => ({ ...prev, status_automatizacao: value }))}
+                         >
+                           <SelectTrigger>
+                             <SelectValue placeholder="Selecione o status" />
+                           </SelectTrigger>
+                           <SelectContent>
+                             <SelectItem value="Manual">Manual</SelectItem>
+                             <SelectItem value="Planejado">Planejado</SelectItem>
+                             <SelectItem value="Automatizado">Automatizado</SelectItem>
+                           </SelectContent>
+                         </Select>
+                       </div>
+                       
+                       <div>
+                         <Label htmlFor="status_validacao">Status de Validação pela Área</Label>
+                         <Select
+                           value={form.status_validacao || 'Pendente'}
+                           onValueChange={(value) => setForm(prev => ({ ...prev, status_validacao: value }))}
+                         >
+                           <SelectTrigger>
+                             <SelectValue placeholder="Selecione o status" />
+                           </SelectTrigger>
+                           <SelectContent>
+                             <SelectItem value="Pendente">Pendente</SelectItem>
+                             <SelectItem value="Validado">Validado</SelectItem>
+                           </SelectContent>
+                         </Select>
+                       </div>
+                       
+                       <div>
+                         <Label htmlFor="link_solicitacao">Link ou caminho onde solicitar</Label>
+                         <Input
+                           id="link_solicitacao"
+                           value={form.link_solicitacao || ''}
+                           onChange={(e) => setForm(prev => ({ ...prev, link_solicitacao: e.target.value }))}
+                           placeholder="URL clicável ou caminho no sistema/intranet"
+                           className="text-black"
+                         />
+                       </div>
                      </>
                    )}
                 </div>
@@ -942,13 +1026,14 @@ export default function NovaSugestao() {
                     {getValidationMessage() && (
                       <p className="text-sm text-red-600">{getValidationMessage()}</p>
                     )}
+
                     <Button 
                       type="submit" 
                       disabled={!isFormValid() || isSubmitting}
-                      onClick={() => console.log("Botão Enviar Sugestão clicado")}
                     >
                       {isSubmitting ? "Enviando..." : "Enviar Sugestão"}
                     </Button>
+
                   </div>
                 </div>
               </form>

@@ -1,30 +1,70 @@
-import { useState } from "react";
-
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Check, X, Eye, Clock, FileText, Filter, FilterX, Search, Calendar, User, TrendingUp } from "lucide-react";
-import { useSugestoes, useUpdateSugestao } from "@/hooks/useSugestoes";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Separator } from "@/components/ui/separator";
+import { useSugestoes, useUpdateSugestao } from "@/hooks/useSugestoes";
+import { 
+  Check, 
+  X, 
+  Clock, 
+  FileText, 
+  Filter, 
+  FilterX, 
+  AlertCircle,
+  CheckCircle,
+  XCircle,
+  MessageSquare,
+  Calendar as CalendarIcon,
+  Tag,
+  Building,
+  User as UserIcon,
+  AlertTriangle,
+  Eye,
+  Edit,
+  ArrowLeft
+} from "lucide-react";
+
+interface Filters {
+  status: string;
+  tipo: string;
+  search: string;
+  dataInicio: string;
+  dataFim: string;
+}
+
+interface Sugestao {
+  id: string;
+  status: string;
+  tipo: string;
+  justificativa?: string;
+  dados_sugeridos: any;
+  created_at: string;
+  comentario_admin?: string;
+  user_id?: string;
+}
 
 export default function AdminSugestoes() {
   const { toast } = useToast();
   const { data: sugestoes, isLoading } = useSugestoes();
   const updateSugestao = useUpdateSugestao();
-  const [comentarioAdmin, setComentarioAdmin] = useState("");
-  const [justificativaRejeicao, setJustificativaRejeicao] = useState("");
-  const [selectedSugestao, setSelectedSugestao] = useState<string | null>(null);
+
+  // Debug dos dados
+  console.log('🔍 useSugestoes - isLoading:', isLoading);
+  console.log('🔍 useSugestoes - sugestoes:', sugestoes);
+  console.log('🔍 useSugestoes - sugestoes length:', sugestoes?.length);
+
+  const [selectedSugestao, setSelectedSugestao] = useState<Sugestao | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [comentarioAprovacao, setComentarioAprovacao] = useState('');
+  const [justificativaRejeicao, setJustificativaRejeicao] = useState('');
+  const [comentarioAdicional, setComentarioAdicional] = useState('');
   const [processingId, setProcessingId] = useState<string | null>(null);
-  
-  // Filtros
-  const [showFilters, setShowFilters] = useState(false);
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<Filters>({
     status: '',
     tipo: '',
     search: '',
@@ -32,24 +72,25 @@ export default function AdminSugestoes() {
     dataFim: ''
   });
 
-  // Aplicar filtros
   const filteredSugestoes = sugestoes?.filter(sugestao => {
-    const matchesStatus = !filters.status || filters.status === 'todos' || sugestao.status === filters.status;
-    const matchesTipo = !filters.tipo || filters.tipo === 'todos' || sugestao.tipo === filters.tipo;
+    const matchesStatus = !filters.status || sugestao.status === filters.status;
+    const matchesTipo = !filters.tipo || sugestao.tipo === filters.tipo;
     const matchesSearch = !filters.search || 
-      sugestao.dados_sugeridos.produto?.toLowerCase().includes(filters.search.toLowerCase()) ||
-      sugestao.dados_sugeridos.area?.toLowerCase().includes(filters.search.toLowerCase()) ||
+      (sugestao.dados_sugeridos as any)?.produto?.toLowerCase().includes(filters.search.toLowerCase()) ||
+      (sugestao.dados_sugeridos as any)?.oQueE?.toLowerCase().includes(filters.search.toLowerCase()) ||
       sugestao.justificativa?.toLowerCase().includes(filters.search.toLowerCase());
-    
-    const data = new Date(sugestao.created_at);
-    const dataInicio = filters.dataInicio ? new Date(filters.dataInicio) : null;
-    const dataFim = filters.dataFim ? new Date(filters.dataFim) : null;
-    
-    const matchesDataInicio = !dataInicio || data >= dataInicio;
-    const matchesDataFim = !dataFim || data <= dataFim;
+    const matchesDataInicio = !filters.dataInicio || new Date(sugestao.created_at) >= new Date(filters.dataInicio);
+    const matchesDataFim = !filters.dataFim || new Date(sugestao.created_at) <= new Date(filters.dataFim);
     
     return matchesStatus && matchesTipo && matchesSearch && matchesDataInicio && matchesDataFim;
   }) || [];
+
+  // Ordenar sugestões: pendentes primeiro
+  const sortedSugestoes = [...filteredSugestoes].sort((a, b) => {
+    if (a.status === 'pendente' && b.status !== 'pendente') return -1;
+    if (a.status !== 'pendente' && b.status === 'pendente') return 1;
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
 
   // Estatísticas
   const stats = {
@@ -71,15 +112,33 @@ export default function AdminSugestoes() {
 
   const hasActiveFilters = Object.values(filters).some(value => value !== '');
 
-  const handleApprove = async (id: string) => {
-    if (processingId) return;
+  const openSugestaoModal = (sugestao: any) => {
+    console.log('🔍 Abrindo modal para sugestão:', sugestao);
+    setSelectedSugestao(sugestao);
+    setComentarioAprovacao('');
+    setJustificativaRejeicao('');
+    setComentarioAdicional('');
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    console.log('🔍 Fechando modal');
+    setIsModalOpen(false);
+    setSelectedSugestao(null);
+    setComentarioAprovacao('');
+    setJustificativaRejeicao('');
+    setComentarioAdicional('');
+  };
+
+  const handleApprove = async () => {
+    if (!selectedSugestao || processingId) return;
     
-    setProcessingId(id);
+    setProcessingId(selectedSugestao.id);
     try {
       await updateSugestao.mutateAsync({
-        id,
+        id: selectedSugestao.id,
         status: 'aprovada',
-        comentario_admin: comentarioAdmin
+        comentario_admin: comentarioAprovacao || undefined
       });
       
       toast({
@@ -87,64 +146,21 @@ export default function AdminSugestoes() {
         description: "A sugestão foi aprovada com sucesso.",
       });
       
-      setComentarioAdmin("");
-      setSelectedSugestao(null);
+      closeModal();
     } catch (error: any) {
       console.error('Erro ao aprovar:', error);
-      
-      let errorMessage = "Erro ao aprovar sugestão. Verifique se você está logado.";
-      
-      if (error.message) {
-        if (error.message.includes('área') && error.message.includes('obrigatório')) {
-          errorMessage = "Nome da área é obrigatório.";
-        } else if (error.message.includes('processo') && error.message.includes('obrigatório')) {
-          errorMessage = "Nome do processo é obrigatório.";
-        } else if (error.message.includes('subprocesso') && error.message.includes('obrigatório')) {
-          errorMessage = "Nome do subprocesso é obrigatório.";
-        } else if (error.message.includes('serviço') && error.message.includes('obrigatório')) {
-          errorMessage = "Nome do serviço é obrigatório.";
-        } else if (error.message.includes('selecionar uma área')) {
-          errorMessage = "É necessário selecionar uma área para criar um processo/subprocesso/serviço.";
-        } else if (error.message.includes('selecionar um processo')) {
-          errorMessage = "É necessário selecionar um processo para criar um subprocesso/serviço.";
-        } else if (error.message.includes('selecionar um subprocesso')) {
-          errorMessage = "É necessário selecionar um subprocesso para criar um serviço.";
-        } else if (error.message.includes('selecionar um serviço')) {
-          errorMessage = "É necessário selecionar um serviço para edição.";
-        } else if (error.message.includes('criar área')) {
-          errorMessage = `Erro ao criar área: ${error.message.split('criar área: ')[1]}`;
-        } else if (error.message.includes('criar processo')) {
-          errorMessage = `Erro ao criar processo: ${error.message.split('criar processo: ')[1]}`;
-        } else if (error.message.includes('criar subprocesso')) {
-          errorMessage = `Erro ao criar subprocesso: ${error.message.split('criar subprocesso: ')[1]}`;
-        } else if (error.message.includes('criar serviço')) {
-          errorMessage = `Erro ao criar serviço: ${error.message.split('criar serviço: ')[1]}`;
-        } else if (error.message.includes('atualizar área')) {
-          errorMessage = `Erro ao atualizar área: ${error.message.split('atualizar área: ')[1]}`;
-        } else if (error.message.includes('atualizar processo')) {
-          errorMessage = `Erro ao atualizar processo: ${error.message.split('atualizar processo: ')[1]}`;
-        } else if (error.message.includes('atualizar subprocesso')) {
-          errorMessage = `Erro ao atualizar subprocesso: ${error.message.split('atualizar subprocesso: ')[1]}`;
-        } else if (error.message.includes('atualizar serviço')) {
-          errorMessage = `Erro ao atualizar serviço: ${error.message.split('atualizar serviço: ')[1]}`;
-        }
-      }
-      
       toast({
         title: "Erro",
-        description: errorMessage,
+        description: "Erro ao aprovar sugestão. Verifique se você está logado.",
         variant: "destructive"
       });
     } finally {
       setProcessingId(null);
-      setTimeout(() => {
-        setProcessingId(null);
-      }, 10000);
     }
   };
 
-  const handleReject = async (id: string) => {
-    if (processingId) return;
+  const handleReject = async () => {
+    if (!selectedSugestao || processingId) return;
     
     if (!justificativaRejeicao.trim()) {
       toast({
@@ -155,12 +171,14 @@ export default function AdminSugestoes() {
       return;
     }
     
-    setProcessingId(id);
+    setProcessingId(selectedSugestao.id);
     try {
+      const comentarioCompleto = `${justificativaRejeicao}${comentarioAdicional ? `\n\nComentário adicional: ${comentarioAdicional}` : ''}`;
+      
       await updateSugestao.mutateAsync({
-        id,
+        id: selectedSugestao.id,
         status: 'rejeitada',
-        comentario_admin: `${justificativaRejeicao}${comentarioAdmin ? `\n\nComentário adicional: ${comentarioAdmin}` : ''}`
+        comentario_admin: comentarioCompleto
       });
       
       toast({
@@ -168,9 +186,7 @@ export default function AdminSugestoes() {
         description: "A sugestão foi rejeitada.",
       });
       
-      setComentarioAdmin("");
-      setJustificativaRejeicao("");
-      setSelectedSugestao(null);
+      closeModal();
     } catch (error: any) {
       console.error('Erro ao rejeitar:', error);
       toast({
@@ -184,14 +200,14 @@ export default function AdminSugestoes() {
   };
 
   const getStatusBadge = (status: string) => {
-    const statusMap = {
-      'pendente': { label: 'Pendente', variant: 'secondary' as const, color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
-      'aprovada': { label: 'Aprovada', variant: 'default' as const, color: 'bg-green-100 text-green-800 border-green-200' },
-      'rejeitada': { label: 'Rejeitada', variant: 'destructive' as const, color: 'bg-red-100 text-red-800 border-red-200' }
+    const variants = {
+      pendente: "bg-yellow-100 text-yellow-800 border-yellow-200",
+      aprovada: "bg-green-100 text-green-800 border-green-200",
+      rejeitada: "bg-red-100 text-red-800 border-red-200"
     };
-    
-    const statusInfo = statusMap[status as keyof typeof statusMap] || statusMap.pendente;
-    return <Badge variant={statusInfo.variant} className={statusInfo.color}>{statusInfo.label}</Badge>;
+    return <Badge className={`${variants[status as keyof typeof variants] || "bg-gray-100 text-gray-800"} border`}>
+      {status.charAt(0).toUpperCase() + status.slice(1)}
+    </Badge>;
   };
 
   const formatDate = (dateString: string) => {
@@ -204,402 +220,486 @@ export default function AdminSugestoes() {
     });
   };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background">
-        <main className="container mx-auto px-6 py-8">
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'pendente':
+        return <Clock className="h-4 w-4 text-yellow-600" />;
+      case 'aprovada':
+        return <CheckCircle className="h-4 w-4 text-green-600" />;
+      case 'rejeitada':
+        return <XCircle className="h-4 w-4 text-red-600" />;
+      default:
+        return <AlertCircle className="h-4 w-4 text-gray-600" />;
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* INDICADOR DE NOVA VERSÃO */}
+      <div className="bg-red-500 text-white p-4 rounded-lg text-center">
+        <h2 className="text-xl font-bold">🚀 NOVA VERSÃO ATIVA!</h2>
+        <p>Se você está vendo esta mensagem, as mudanças foram aplicadas com sucesso!</p>
+      </div>
+
+      {/* Debug info */}
+      <div className="bg-blue-100 p-4 rounded-lg">
+        <p className="text-sm">Debug: {sugestoes?.length || 0} sugestões carregadas</p>
+        <p className="text-sm">Modal aberto: {isModalOpen ? 'Sim' : 'Não'}</p>
+        <p className="text-sm">Sugestão selecionada: {selectedSugestao?.id || 'Nenhuma'}</p>
+        <Button 
+          onClick={() => {
+            console.log('🔍 Teste manual do modal');
+            setSelectedSugestao({
+              id: 'teste',
+              status: 'pendente',
+              tipo: 'novo',
+              justificativa: 'Teste',
+              dados_sugeridos: { produto: 'Teste' },
+              created_at: new Date().toISOString()
+            });
+            setIsModalOpen(true);
+          }}
+          className="mt-2"
+        >
+          Testar Modal Manualmente
+        </Button>
+      </div>
+
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold">Avaliar Sugestões</h1>
+          <p className="text-gray-600 mt-1">Avalie e gerencie sugestões dos usuários</p>
+        </div>
+        {stats.pendentes > 0 && (
+          <div className="flex items-center space-x-2">
+            <AlertCircle className="h-5 w-5 text-orange-500" />
+            <span className="text-sm font-medium text-orange-700">
+              {stats.pendentes} sugestão{stats.pendentes > 1 ? 'ões' : ''} aguardando avaliação
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Estatísticas */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card className="border-l-4 border-l-blue-500">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-3">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <FileText className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total</p>
+                <p className="text-2xl font-bold text-blue-600">{stats.total}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-l-4 border-l-yellow-500">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-3">
+              <div className="p-2 bg-yellow-100 rounded-lg">
+                <Clock className="h-5 w-5 text-yellow-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600">Pendentes</p>
+                <p className="text-2xl font-bold text-yellow-600">{stats.pendentes}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-l-4 border-l-green-500">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-3">
+              <div className="p-2 bg-green-100 rounded-lg">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600">Aprovadas</p>
+                <p className="text-2xl font-bold text-green-600">{stats.aprovadas}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-l-4 border-l-red-500">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-3">
+              <div className="p-2 bg-red-100 rounded-lg">
+                <XCircle className="h-5 w-5 text-red-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600">Rejeitadas</p>
+                <p className="text-2xl font-bold text-red-600">{stats.rejeitadas}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Filtros */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center space-x-2">
+              <Filter className="h-5 w-5" />
+              <span>Filtros</span>
+            </CardTitle>
+            {hasActiveFilters && (
+              <Button variant="outline" size="sm" onClick={clearFilters}>
+                <FilterX className="h-4 w-4 mr-2" />
+                Limpar Filtros
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div>
+              <label className="text-sm font-medium">Buscar</label>
+              <Input
+                placeholder="Buscar por nome, descrição..."
+                value={filters.search}
+                onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Status</label>
+              <Select value={filters.status} onValueChange={(value) => setFilters(prev => ({ ...prev, status: value }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todos os status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Todos</SelectItem>
+                  <SelectItem value="pendente">Pendente</SelectItem>
+                  <SelectItem value="aprovada">Aprovada</SelectItem>
+                  <SelectItem value="rejeitada">Rejeitada</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Tipo</label>
+              <Select value={filters.tipo} onValueChange={(value) => setFilters(prev => ({ ...prev, tipo: value }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todos os tipos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Todos</SelectItem>
+                  <SelectItem value="novo">Novo Serviço</SelectItem>
+                  <SelectItem value="edicao">Edição</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Data Início</label>
+              <Input
+                type="date"
+                value={filters.dataInicio}
+                onChange={(e) => setFilters(prev => ({ ...prev, dataInicio: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Data Fim</label>
+              <Input
+                type="date"
+                value={filters.dataFim}
+                onChange={(e) => setFilters(prev => ({ ...prev, dataFim: e.target.value }))}
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Lista de Sugestões */}
+      <div className="space-y-4">
+        {isLoading ? (
           <div className="flex items-center justify-center h-64">
             <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
           </div>
-        </main>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-background">
-      <main className="container mx-auto px-6 py-8">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground mb-2">
-              Administração de Sugestões
-            </h1>
-            <p className="text-muted-foreground">
-              Gerencie as sugestões enviadas pelos colaboradores
-            </p>
-          </div>
-        </div>
-
-        {/* Estatísticas */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        ) : sortedSugestoes.length === 0 ? (
           <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <FileText className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{stats.total}</p>
-                  <p className="text-sm text-muted-foreground">Total de Sugestões</p>
-                </div>
-              </div>
+            <CardContent className="p-8 text-center">
+              <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-500">Nenhuma sugestão encontrada.</p>
             </CardContent>
           </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-lg bg-yellow-500/10 flex items-center justify-center">
-                  <Clock className="h-5 w-5 text-yellow-500" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{stats.pendentes}</p>
-                  <p className="text-sm text-muted-foreground">Pendentes</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center">
-                  <Check className="h-5 w-5 text-green-500" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{stats.aprovadas}</p>
-                  <p className="text-sm text-muted-foreground">Aprovadas</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center">
-                  <X className="h-5 w-5 text-red-500" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{stats.rejeitadas}</p>
-                  <p className="text-sm text-muted-foreground">Rejeitadas</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Filtros */}
-        <Card className="mb-6">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center space-x-2">
-                  <Filter className="h-5 w-5" />
-                  <span>Filtros e Busca</span>
-                </CardTitle>
-                <CardDescription>
-                  Filtre e busque sugestões específicas
-                </CardDescription>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Button 
-                  variant={showFilters ? "default" : "outline"} 
-                  size="sm"
-                  onClick={() => setShowFilters(!showFilters)}
-                >
-                  <Filter className="mr-2 h-4 w-4" />
-                  Filtros
-                  {hasActiveFilters && (
-                    <Badge variant="secondary" className="ml-2 h-5 w-5 p-0 text-xs">
-                      {Object.values(filters).filter(v => v !== '').length}
-                    </Badge>
-                  )}
-                </Button>
-                {hasActiveFilters && (
-                  <Button variant="outline" size="sm" onClick={clearFilters}>
-                    <FilterX className="mr-2 h-4 w-4" />
-                    Limpar
-                  </Button>
-                )}
-              </div>
-            </div>
-          </CardHeader>
-          
-          {showFilters && (
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                <div>
-                  <Label className="text-sm font-medium mb-2 block">Buscar</Label>
-                  <Input
-                    placeholder="Buscar por título, área, justificativa..."
-                    value={filters.search}
-                    onChange={(e) => setFilters({...filters, search: e.target.value})}
-                  />
-                </div>
-
-                <div>
-                  <Label className="text-sm font-medium mb-2 block">Status</Label>
-                  <Select value={filters.status} onValueChange={(value) => setFilters({...filters, status: value})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Todos os status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="todos">Todos os status</SelectItem>
-                      <SelectItem value="pendente">Pendente</SelectItem>
-                      <SelectItem value="aprovada">Aprovada</SelectItem>
-                      <SelectItem value="rejeitada">Rejeitada</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label className="text-sm font-medium mb-2 block">Tipo</Label>
-                  <Select value={filters.tipo} onValueChange={(value) => setFilters({...filters, tipo: value})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Todos os tipos" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="todos">Todos os tipos</SelectItem>
-                      <SelectItem value="novo">Novo Serviço</SelectItem>
-                      <SelectItem value="melhoria">Melhoria</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label className="text-sm font-medium mb-2 block">Data Início</Label>
-                  <Input
-                    type="date"
-                    value={filters.dataInicio}
-                    onChange={(e) => setFilters({...filters, dataInicio: e.target.value})}
-                  />
-                </div>
-
-                <div>
-                  <Label className="text-sm font-medium mb-2 block">Data Fim</Label>
-                  <Input
-                    type="date"
-                    value={filters.dataFim}
-                    onChange={(e) => setFilters({...filters, dataFim: e.target.value})}
-                  />
-                </div>
-              </div>
-            </CardContent>
-          )}
-        </Card>
-
-        {/* Results Info */}
-        <div className="flex items-center justify-between mb-6">
-          <p className="text-sm text-muted-foreground">
-            Mostrando {filteredSugestoes.length} de {stats.total} sugestões
-            {hasActiveFilters && (
-              <span className="ml-2">
-                • Filtros ativos: {Object.values(filters).filter(v => v !== '').length}
-              </span>
-            )}
-          </p>
-        </div>
-
-        {/* Sugestões */}
-        <div className="grid gap-6">
-          {!filteredSugestoes || filteredSugestoes.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold text-foreground mb-2">
-                  Nenhuma sugestão encontrada
-                </h3>
-                <p className="text-muted-foreground text-center">
-                  {hasActiveFilters 
-                    ? 'Nenhuma sugestão corresponde aos filtros aplicados.'
-                    : 'Não há sugestões para revisar no momento.'
-                  }
-                </p>
-                {hasActiveFilters && (
-                  <Button variant="outline" onClick={clearFilters} className="mt-4">
-                    Limpar Filtros
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          ) : (
-            filteredSugestoes.map((sugestao) => (
-              <Card key={sugestao.id} className="overflow-hidden hover:shadow-lg transition-shadow duration-200">
-                <CardHeader>
+        ) : (
+          <div className="grid gap-4">
+            {sortedSugestoes.map((sugestao) => (
+              <Card 
+                key={sugestao.id} 
+                className={`hover:shadow-lg transition-all duration-200 cursor-pointer ${
+                  sugestao.status === 'pendente' ? 'border-l-4 border-l-yellow-500 bg-yellow-50/30' : ''
+                }`}
+                onClick={() => {
+                  console.log('🔍 Clicou na sugestão:', sugestao.id);
+                  openSugestaoModal(sugestao);
+                }}
+              >
+                <CardContent className="p-6">
                   <div className="flex items-start justify-between">
-                    <div className="space-y-1 flex-1">
-                      <CardTitle className="text-xl">
-                        {sugestao.dados_sugeridos.produto}
-                      </CardTitle>
-                      <CardDescription className="flex items-center space-x-2">
-                        <Badge variant="outline" className="text-xs">
-                          {sugestao.tipo === 'novo' ? 'Novo Serviço' : 'Melhoria de Serviço'}
-                        </Badge>
-                        <span>•</span>
-                        <span>Enviado em {formatDate(sugestao.created_at)}</span>
-                      </CardDescription>
-                    </div>
-                    {getStatusBadge(sugestao.status)}
-                  </div>
-                </CardHeader>
-                
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label className="text-sm font-medium text-muted-foreground">Área</Label>
-                      <p className="text-sm">{sugestao.dados_sugeridos.area || 'Não informado'}</p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium text-muted-foreground">Processo</Label>
-                      <p className="text-sm">{sugestao.dados_sugeridos.processo || 'Não informado'}</p>
-                    </div>
-                  </div>
-
-                  {sugestao.dados_sugeridos.subprocesso && (
-                    <div>
-                      <Label className="text-sm font-medium text-muted-foreground">Subprocesso</Label>
-                      <p className="text-sm">{sugestao.dados_sugeridos.subprocesso}</p>
-                    </div>
-                  )}
-
-                  {sugestao.dados_sugeridos.servico && (
-                    <div>
-                      <Label className="text-sm font-medium text-muted-foreground">Serviço</Label>
-                      <p className="text-sm">{sugestao.dados_sugeridos.servico}</p>
-                    </div>
-                  )}
-
-                  <div>
-                    <Label className="text-sm font-medium text-muted-foreground">Descrição</Label>
-                    <p className="text-sm mt-1">{sugestao.dados_sugeridos.oQueE || sugestao.dados_sugeridos.descricao || 'Não informado'}</p>
-                  </div>
-
-                  {sugestao.justificativa && (
-                    <div>
-                      <Label className="text-sm font-medium text-muted-foreground">Justificativa</Label>
-                      <p className="text-sm mt-1">{sugestao.justificativa}</p>
-                    </div>
-                  )}
-
-                  {sugestao.comentario_admin && (
-                    <div className="bg-muted p-3 rounded-lg">
-                      <Label className="text-sm font-medium text-muted-foreground">Comentário do Admin</Label>
-                      <p className="text-sm mt-1">{sugestao.comentario_admin}</p>
-                    </div>
-                  )}
-
-                  {sugestao.status === 'pendente' && (
-                    <>
-                      <Separator />
-                      <div className="space-y-3">
-                        <div>
-                          <Label htmlFor={`justificativa-${sugestao.id}`}>
-                            Justificativa para Rejeição *
-                          </Label>
-                          <Textarea
-                            id={`justificativa-${sugestao.id}`}
-                            placeholder="Explique o motivo da rejeição (obrigatório)..."
-                            value={selectedSugestao === sugestao.id ? justificativaRejeicao : ''}
-                            onChange={(e) => {
-                              setSelectedSugestao(sugestao.id);
-                              setJustificativaRejeicao(e.target.value);
-                            }}
-                            className="mt-1"
-                          />
+                    <div className="flex-1 space-y-3">
+                      <div className="flex items-center space-x-3">
+                        <div className="flex items-center space-x-2">
+                          {getStatusIcon(sugestao.status)}
+                          {getStatusBadge(sugestao.status)}
                         </div>
-                        
-                        <div>
-                          <Label htmlFor={`comentario-${sugestao.id}`}>
-                            Comentário Adicional (opcional)
-                          </Label>
-                          <Textarea
-                            id={`comentario-${sugestao.id}`}
-                            placeholder="Adicione um comentário adicional se necessário..."
-                            value={selectedSugestao === sugestao.id ? comentarioAdmin : ''}
-                            onChange={(e) => {
-                              setSelectedSugestao(sugestao.id);
-                              setComentarioAdmin(e.target.value);
-                            }}
-                            className="mt-1"
-                          />
-                        </div>
-                        
-                        <div className="flex space-x-2">
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button size="sm" className="flex-1" disabled={processingId === sugestao.id} aria-label="Aprovar sugestão">
-                                {processingId === sugestao.id ? (
-                                  <>
-                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                    Processando...
-                                  </>
-                                ) : (
-                                  <>
-                                    <Check className="mr-2 h-4 w-4" />
-                                    Aprovar
-                                  </>
-                                )}
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Aprovar Sugestão</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Tem certeza que deseja aprovar esta sugestão? Esta ação não pode ser desfeita.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleApprove(sugestao.id)}>
-                                  Confirmar Aprovação
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="destructive" size="sm" className="flex-1" disabled={processingId === sugestao.id} aria-label="Rejeitar sugestão">
-                                {processingId === sugestao.id ? (
-                                  <>
-                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                    Processando...
-                                  </>
-                                ) : (
-                                  <>
-                                    <X className="mr-2 h-4 w-4" />
-                                    Rejeitar
-                                  </>
-                                )}
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Rejeitar Sugestão</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Tem certeza que deseja rejeitar esta sugestão? Esta ação não pode ser desfeita.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleReject(sugestao.id)}>
-                                  Confirmar Rejeição
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
+                        {sugestao.status === 'pendente' && (
+                          <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
+                            <AlertCircle className="h-3 w-3 mr-1" />
+                            Aguardando Avaliação
+                          </Badge>
+                        )}
                       </div>
-                    </>
-                  )}
+                      
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                          {(sugestao.dados_sugeridos as any)?.produto || 'Sugestão'}
+                        </h3>
+                        <p className="text-sm text-gray-600 line-clamp-2">
+                          {(sugestao.dados_sugeridos as any)?.oQueE || sugestao.justificativa}
+                        </p>
+                      </div>
+                      
+                      <div className="flex items-center space-x-4 text-xs text-gray-500">
+                        <span className="flex items-center">
+                          <Tag className="h-3 w-3 mr-1" />
+                          {sugestao.tipo === 'novo' ? 'Novo Serviço' : 'Edição'}
+                        </span>
+                        <span className="flex items-center">
+                          <Building className="h-3 w-3 mr-1" />
+                          {(sugestao.dados_sugeridos as any)?.area || 'Não informado'}
+                        </span>
+                        <span className="flex items-center">
+                          <CalendarIcon className="h-3 w-3 mr-1" />
+                          {formatDate(sugestao.created_at)}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="flex items-center space-x-2"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          console.log('🔍 Clicou no botão Ver Detalhes');
+                          openSugestaoModal(sugestao);
+                        }}
+                      >
+                        <Eye className="h-4 w-4" />
+                        <span>Ver Detalhes</span>
+                      </Button>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
-            ))
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Modal de Teste Simples */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="max-w-2xl z-[9999]">
+          <DialogHeader>
+            <DialogTitle>Teste Modal</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p>Modal está funcionando!</p>
+            <p>Sugestão selecionada: {selectedSugestao?.id || 'Nenhuma'}</p>
+            <p>Status: {selectedSugestao?.status || 'N/A'}</p>
+            <Button onClick={closeModal}>Fechar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Detalhes da Sugestão */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto z-[9999]">
+          {selectedSugestao && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center space-x-3">
+                  <Button variant="ghost" size="sm" onClick={closeModal} className="p-0 h-auto">
+                    <ArrowLeft className="h-4 w-4" />
+                  </Button>
+                  <div>
+                    <h2 className="text-xl font-bold">
+                      {(selectedSugestao.dados_sugeridos as any)?.produto || 'Sugestão'}
+                    </h2>
+                    <div className="flex items-center space-x-2 mt-2">
+                      {getStatusBadge(selectedSugestao.status)}
+                      <span className="text-sm text-gray-500">
+                        Criado em {formatDate(selectedSugestao.created_at)}
+                      </span>
+                    </div>
+                  </div>
+                </DialogTitle>
+              </DialogHeader>
+
+              <div className="space-y-6">
+                {/* Informações Gerais */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="font-semibold text-gray-900 mb-2 flex items-center">
+                        <MessageSquare className="h-4 w-4 mr-2" />
+                        Descrição
+                      </h3>
+                      <div className="bg-gray-50 p-4 rounded-lg">
+                        <p className="text-sm">
+                          {(selectedSugestao.dados_sugeridos as any)?.descricao || selectedSugestao.justificativa || 'Não informado'}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <h3 className="font-semibold text-gray-900 mb-2 flex items-center">
+                        <AlertCircle className="h-4 w-4 mr-2" />
+                        Justificativa
+                      </h3>
+                      <div className="bg-gray-50 p-4 rounded-lg">
+                        <p className="text-sm">
+                          {selectedSugestao.justificativa || 'Não informado'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    {selectedSugestao.dados_sugeridos && (
+                      <div>
+                        <h3 className="font-semibold text-gray-900 mb-2 flex items-center">
+                          <FileText className="h-4 w-4 mr-2" />
+                          Dados Sugeridos
+                        </h3>
+                        <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+                          {Object.entries(selectedSugestao.dados_sugeridos).map(([key, value]) => (
+                            <div key={key} className="flex text-sm">
+                              <span className="font-medium w-32 text-gray-700">{key}:</span>
+                              <span className="flex-1">{String(value)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {selectedSugestao.comentario_admin && (
+                      <div>
+                        <h3 className="font-semibold text-gray-900 mb-2 flex items-center">
+                          <UserIcon className="h-4 w-4 mr-2" />
+                          Comentário do Administrador
+                        </h3>
+                        <div className="bg-blue-50 p-4 rounded-lg border-l-4 border-l-blue-500">
+                          <p className="text-sm">
+                            {selectedSugestao.comentario_admin}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Ações - apenas para sugestões pendentes */}
+                {selectedSugestao.status === 'pendente' && (
+                  <div className="border-t pt-6">
+                    <h3 className="font-semibold text-lg mb-4 flex items-center">
+                      <CheckCircle className="h-5 w-5 mr-2 text-green-600" />
+                      Avaliar Sugestão
+                    </h3>
+                    
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* Aprovar */}
+                      <div className="border rounded-lg p-4 bg-green-50 border-green-200">
+                        <h4 className="font-semibold text-green-800 mb-3 flex items-center">
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          Aprovar Sugestão
+                        </h4>
+                        <div className="space-y-3">
+                          <Textarea
+                            placeholder="Adicione um comentário adicional se necessário (opcional)..."
+                            value={comentarioAprovacao}
+                            onChange={(e) => setComentarioAprovacao(e.target.value)}
+                            className="min-h-[80px]"
+                          />
+                          <Button
+                            onClick={handleApprove}
+                            disabled={processingId === selectedSugestao.id}
+                            className="bg-green-600 hover:bg-green-700 w-full"
+                          >
+                            {processingId === selectedSugestao.id ? (
+                              <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                Processando...
+                              </>
+                            ) : (
+                              <>
+                                <Check className="mr-2 h-4 w-4" />
+                                Aprovar Sugestão
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Rejeitar */}
+                      <div className="border rounded-lg p-4 bg-red-50 border-red-200">
+                        <h4 className="font-semibold text-red-800 mb-3 flex items-center">
+                          <XCircle className="h-4 w-4 mr-2" />
+                          Rejeitar Sugestão
+                        </h4>
+                        <div className="space-y-3">
+                          <Textarea
+                            placeholder="Explique o motivo da rejeição (obrigatório)..."
+                            value={justificativaRejeicao}
+                            onChange={(e) => setJustificativaRejeicao(e.target.value)}
+                            className="min-h-[80px]"
+                            required
+                          />
+                          <Textarea
+                            placeholder="Adicione um comentário adicional se necessário..."
+                            value={comentarioAdicional}
+                            onChange={(e) => setComentarioAdicional(e.target.value)}
+                            className="min-h-[60px]"
+                          />
+                          <Button
+                            onClick={handleReject}
+                            disabled={processingId === selectedSugestao.id || !justificativaRejeicao.trim()}
+                            variant="destructive"
+                            className="w-full"
+                          >
+                            {processingId === selectedSugestao.id ? (
+                              <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                Processando...
+                              </>
+                            ) : (
+                              <>
+                                <X className="mr-2 h-4 w-4" />
+                                Rejeitar Sugestão
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Debug info no modal */}
+                <div className="bg-yellow-100 p-4 rounded-lg">
+                  <p className="text-sm">Debug Modal:</p>
+                  <p className="text-sm">ID: {selectedSugestao.id}</p>
+                  <p className="text-sm">Status: {selectedSugestao.status}</p>
+                  <p className="text-sm">Comentário Aprovação: {comentarioAprovacao}</p>
+                  <p className="text-sm">Justificativa Rejeição: {justificativaRejeicao}</p>
+                </div>
+              </div>
+            </>
           )}
-        </div>
-      </main>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
