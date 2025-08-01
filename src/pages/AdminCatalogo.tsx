@@ -13,6 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ViewOptions, ViewMode } from "@/components/ui/view-options";
 import { 
   Building2, 
   Settings, 
@@ -32,7 +33,9 @@ import {
   Filter,
   ChevronDown,
   Check,
-  X
+  X,
+  Grid3X3,
+  List
 } from "lucide-react";
 import { useIsAdmin, useAdminAreas, useAdminProcessos, useAdminSubprocessos, useAdminServicos, useCreateArea, useUpdateArea, useDeleteArea, useCreateProcesso, useUpdateProcesso, useDeleteProcesso, useCreateSubprocesso, useUpdateSubprocesso, useDeleteSubprocesso, useCreateServico, useUpdateServico, useDeleteServico } from "@/hooks/useAdmin";
 import { useAreas } from "@/hooks/useAreas";
@@ -50,6 +53,8 @@ export default function AdminCatalogo() {
   const [formData, setFormData] = useState<any>({});
   const [filters, setFilters] = useState<any>({});
   const [showFilters, setShowFilters] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const [showDetails, setShowDetails] = useState(false);
 
   // Verificar se é administrador
   const { data: isAdmin, isLoading: isAdminLoading } = useIsAdmin();
@@ -79,7 +84,7 @@ export default function AdminCatalogo() {
   if (!isAdminLoading && !isAdmin) {
     return (
       <div className="min-h-screen bg-background">
-              <main className="container mx-auto px-6 py-8">
+        <main className="container mx-auto px-6 py-8">
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
               <AlertCircle className="h-12 w-12 text-destructive mb-4" />
@@ -116,21 +121,35 @@ export default function AdminCatalogo() {
 
     // Aplicar filtros
     return data.filter(item => {
-      const matchesSearch = 
-        (activeModule === 'servicos' ? item.produto : item.nome)?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (activeModule === 'servicos' && item.subprocesso?.nome?.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (activeModule === 'servicos' && item.subprocesso?.processo?.nome?.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (activeModule === 'servicos' && item.subprocesso?.processo?.area?.nome?.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (activeModule === 'subprocessos' && item.processo?.nome?.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (activeModule === 'subprocessos' && item.processo?.area?.nome?.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (activeModule === 'processos' && item.area?.nome?.toLowerCase().includes(searchTerm.toLowerCase()));
+      // Busca mais abrangente
+      const searchLower = searchTerm.toLowerCase();
+      const matchesSearch = !searchTerm || 
+        // Busca por nome/produto
+        (activeModule === 'servicos' ? item.produto : item.nome)?.toLowerCase().includes(searchLower) ||
+        // Busca por descrição
+        item.descricao?.toLowerCase().includes(searchLower) ||
+        // Busca por hierarquia (área → processo → subprocesso)
+        (activeModule === 'servicos' && (
+          item.subprocesso?.nome?.toLowerCase().includes(searchLower) ||
+          item.subprocesso?.processo?.nome?.toLowerCase().includes(searchLower) ||
+          item.subprocesso?.processo?.area?.nome?.toLowerCase().includes(searchLower)
+        )) ||
+        (activeModule === 'subprocessos' && (
+          item.processo?.nome?.toLowerCase().includes(searchLower) ||
+          item.processo?.area?.nome?.toLowerCase().includes(searchLower)
+        )) ||
+        (activeModule === 'processos' && item.area?.nome?.toLowerCase().includes(searchLower));
 
-      const matchesStatus = !filters.status || item.ativo === (filters.status === 'ativo');
-      const matchesArea = !filters.area || 
+      // Filtros específicos
+      const matchesStatus = !filters.status || filters.status === 'todos' || 
+        item.ativo === (filters.status === 'ativo');
+      
+      const matchesArea = !filters.area || filters.area === 'todas' || 
         (activeModule === 'processos' && item.area?.id === filters.area) ||
         (activeModule === 'subprocessos' && item.processo?.area?.id === filters.area) ||
         (activeModule === 'servicos' && item.subprocesso?.processo?.area?.id === filters.area);
-      const matchesProcesso = !filters.processo || 
+      
+      const matchesProcesso = !filters.processo || filters.processo === 'todos' || 
         (activeModule === 'subprocessos' && item.processo?.id === filters.processo) ||
         (activeModule === 'servicos' && item.subprocesso?.processo?.id === filters.processo);
 
@@ -369,6 +388,151 @@ export default function AdminCatalogo() {
 
   const isLoading = areasLoading || processosLoading || subprocessosLoading || servicosLoading;
 
+  const renderItemCard = (item: any) => {
+    const isGrid = viewMode === 'grid';
+    const isList = viewMode === 'list';
+    const isCompact = viewMode === 'compact';
+    const isDetailed = viewMode === 'detailed';
+
+    if (isCompact) {
+      return (
+        <Card key={item.id} className="hover:shadow-md transition-shadow">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex-1 min-w-0">
+                <div className="font-medium truncate">
+                  {activeModule === 'servicos' ? item.produto : item.nome}
+                </div>
+                <div className="text-sm text-muted-foreground truncate">
+                  {activeModule === 'servicos' && (
+                    `${item.subprocesso?.processo?.area?.nome} → ${item.subprocesso?.processo?.nome} → ${item.subprocesso?.nome}`
+                  )}
+                  {activeModule === 'subprocessos' && (
+                    `${item.processo?.area?.nome} → ${item.processo?.nome}`
+                  )}
+                  {activeModule === 'processos' && item.area?.nome}
+                  {activeModule === 'areas' && item.descricao}
+                </div>
+              </div>
+              <div className="flex items-center space-x-2 ml-4">
+                <Badge variant={item.ativo ? 'default' : 'secondary'}>
+                  {item.ativo ? 'Ativo' : 'Inativo'}
+                </Badge>
+                <div className="flex space-x-1">
+                  <Button size="sm" variant="outline" onClick={() => handleEdit(item)}>
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button size="sm" variant="outline">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Tem certeza que deseja excluir este item? Esta ação não pode ser desfeita.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleDelete(item.id)}>
+                          Confirmar
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    return (
+      <Card key={item.id} className="hover:shadow-md transition-shadow">
+        <CardHeader>
+          <div className="flex items-start justify-between">
+            <div className="space-y-1">
+              <CardTitle className="text-xl">
+                {activeModule === 'servicos' ? item.produto : item.nome}
+              </CardTitle>
+              <CardDescription>
+                {activeModule === 'servicos' && (
+                  <>
+                    {item.subprocesso?.processo?.area?.nome} → {item.subprocesso?.processo?.nome} → {item.subprocesso?.nome}
+                  </>
+                )}
+                {activeModule === 'subprocessos' && (
+                  <>
+                    {item.processo?.area?.nome} → {item.processo?.nome}
+                  </>
+                )}
+                {activeModule === 'processos' && (
+                  <>
+                    {item.area?.nome}
+                  </>
+                )}
+                {activeModule === 'areas' && item.descricao}
+              </CardDescription>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Badge variant={item.ativo ? 'default' : 'secondary'}>
+                {item.ativo ? 'Ativo' : 'Inativo'}
+              </Badge>
+              <div className="flex space-x-1">
+                <Button size="sm" variant="outline" onClick={() => handleEdit(item)}>
+                  <Edit className="h-4 w-4" />
+                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button size="sm" variant="outline">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Tem certeza que deseja excluir este item? Esta ação não pode ser desfeita.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => handleDelete(item.id)}>
+                        Confirmar
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            </div>
+          </div>
+        </CardHeader>
+        {activeModule === 'servicos' && showDetails && (
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div className="flex items-center space-x-2">
+                <Users className="h-4 w-4 text-muted-foreground" />
+                <span>{item.quem_pode_utilizar || 'Não informado'}</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                <span>{item.tempo_medio ? `${item.tempo_medio} ${item.unidade_medida}` : 'Não informado'}</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Target className="h-4 w-4 text-muted-foreground" />
+                <span>{item.sla ? `${item.sla}h` : 'Não informado'}</span>
+              </div>
+            </div>
+          </CardContent>
+        )}
+      </Card>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <div className="flex">
@@ -440,49 +604,56 @@ export default function AdminCatalogo() {
             </div>
           </div>
 
-          {/* Barra de Pesquisa e Filtros */}
-          <div className="mb-6 space-y-4">
-            <div className="flex items-center space-x-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          {/* Barra de Pesquisa, Filtros e ViewOptions */}
+          <div className="mb-6 space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder={`Pesquisar ${getModuleTitle().toLowerCase()}...`}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 h-9"
                 />
               </div>
               <Button
                 variant="outline"
+                size="sm"
                 onClick={() => setShowFilters(!showFilters)}
                 className={showFilters ? 'bg-primary text-primary-foreground' : ''}
               >
                 <Filter className="mr-2 h-4 w-4" />
                 Filtros
               </Button>
+              <ViewOptions
+                viewMode={viewMode}
+                onViewModeChange={setViewMode}
+                showDetails={showDetails}
+                onShowDetailsChange={setShowDetails}
+              />
               {(Object.keys(filters).length > 0 || searchTerm) && (
-                <Button variant="outline" onClick={clearFilters}>
+                <Button variant="outline" size="sm" onClick={clearFilters}>
                   <X className="mr-2 h-4 w-4" />
                   Limpar
                 </Button>
               )}
             </div>
 
-            {/* Painel de Filtros */}
+            {/* Painel de Filtros Compacto */}
             {showFilters && (
-              <Card className="p-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <Label>Status</Label>
+              <Card className="p-3">
+                <div className="flex flex-wrap gap-3">
+                  <div className="w-48">
+                    <Label className="text-sm">Status</Label>
                     <Select
                       value={filters.status || ''}
                       onValueChange={(value) => setFilters({ ...filters, status: value })}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="h-9">
                         <SelectValue placeholder="Todos os status" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Todos os status</SelectItem>
+                        <SelectItem value="todos">Todos os status</SelectItem>
                         <SelectItem value="ativo">Ativo</SelectItem>
                         <SelectItem value="inativo">Inativo</SelectItem>
                       </SelectContent>
@@ -490,17 +661,17 @@ export default function AdminCatalogo() {
                   </div>
 
                   {activeModule !== 'areas' && (
-                    <div>
-                      <Label>Área</Label>
+                    <div className="w-48">
+                      <Label className="text-sm">Área</Label>
                       <Select
                         value={filters.area || ''}
                         onValueChange={(value) => setFilters({ ...filters, area: value })}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="h-9">
                           <SelectValue placeholder="Todas as áreas" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Todas as áreas</SelectItem>
+                          <SelectItem value="todas">Todas as áreas</SelectItem>
                           {areas?.map((area) => (
                             <SelectItem key={area.id} value={area.id}>
                               {area.nome}
@@ -512,17 +683,17 @@ export default function AdminCatalogo() {
                   )}
 
                   {(activeModule === 'subprocessos' || activeModule === 'servicos') && (
-                    <div>
-                      <Label>Processo</Label>
+                    <div className="w-48">
+                      <Label className="text-sm">Processo</Label>
                       <Select
                         value={filters.processo || ''}
                         onValueChange={(value) => setFilters({ ...filters, processo: value })}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="h-9">
                           <SelectValue placeholder="Todos os processos" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Todos os processos</SelectItem>
+                          <SelectItem value="todos">Todos os processos</SelectItem>
                           {processos?.map((processo) => (
                             <SelectItem key={processo.id} value={processo.id}>
                               {processo.area?.nome} → {processo.nome}
@@ -543,92 +714,24 @@ export default function AdminCatalogo() {
               <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
             </div>
           ) : (
-            <div className="grid gap-4">
-              {getModuleData().map((item) => (
-                <Card key={item.id} className="hover:shadow-md transition-shadow">
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="space-y-1">
-                        <CardTitle className="text-xl">
-                          {activeModule === 'servicos' ? item.produto : item.nome}
-                        </CardTitle>
-                        <CardDescription>
-                          {activeModule === 'servicos' && (
-                            <>
-                              {item.subprocesso?.processo?.area?.nome} → {item.subprocesso?.processo?.nome} → {item.subprocesso?.nome}
-                            </>
-                          )}
-                          {activeModule === 'subprocessos' && (
-                            <>
-                              {item.processo?.area?.nome} → {item.processo?.nome}
-                            </>
-                          )}
-                          {activeModule === 'processos' && (
-                            <>
-                              {item.area?.nome}
-                            </>
-                          )}
-                          {activeModule === 'areas' && item.descricao}
-                        </CardDescription>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge variant={item.ativo ? 'default' : 'secondary'}>
-                          {item.ativo ? 'Ativo' : 'Inativo'}
-                        </Badge>
-                        <div className="flex space-x-1">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleEdit(item)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button size="sm" variant="outline">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Tem certeza que deseja excluir este item? Esta ação não pode ser desfeita.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDelete(item.id)}>
-                                  Confirmar
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  {activeModule === 'servicos' && (
-                    <CardContent>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                        <div className="flex items-center space-x-2">
-                          <Users className="h-4 w-4 text-muted-foreground" />
-                          <span>{item.quem_pode_utilizar || 'Não informado'}</span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Clock className="h-4 w-4 text-muted-foreground" />
-                          <span>{item.tempo_medio ? `${item.tempo_medio} ${item.unidade_medida}` : 'Não informado'}</span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Target className="h-4 w-4 text-muted-foreground" />
-                          <span>{item.sla ? `${item.sla}h` : 'Não informado'}</span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  )}
-                </Card>
-              ))}
-            </div>
+            <>
+              {/* Indicador de resultados */}
+              <div className="mb-4 text-sm text-muted-foreground">
+                {(() => {
+                  const data = getModuleData();
+                  const total = data.length;
+                  const hasFilters = Object.keys(filters).length > 0 || searchTerm;
+                  return hasFilters 
+                    ? `${total} ${total === 1 ? 'item encontrado' : 'itens encontrados'}`
+                    : `${total} ${total === 1 ? 'item' : 'itens'} no total`;
+                })()}
+              </div>
+              
+              {/* Lista de itens */}
+              <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4' : 'space-y-4'}>
+                {getModuleData().map((item) => renderItemCard(item))}
+              </div>
+            </>
           )}
 
           {/* Diálogo de Criação/Edição */}
@@ -711,7 +814,7 @@ export default function AdminCatalogo() {
                                 className="w-full justify-between"
                               >
                                 {formData.area_id
-                                  ? areasForSelect?.find((area) => area.id === formData.area_id)?.nome
+                                  ? (areasForSelect as any[])?.find((area) => area.id === formData.area_id)?.nome
                                   : "Selecione uma área..."}
                                 <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                               </Button>
@@ -722,7 +825,7 @@ export default function AdminCatalogo() {
                                 <CommandList>
                                   <CommandEmpty>Nenhuma área encontrada.</CommandEmpty>
                                   <CommandGroup>
-                                    {areasForSelect?.map((area) => (
+                                    {(areasForSelect as any[])?.map((area) => (
                                       <CommandItem
                                         key={area.id}
                                         value={area.nome}

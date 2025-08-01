@@ -59,7 +59,6 @@ export function extractIdFromSlug(slug: string): string {
 export function createAreaUrl(areaName: string, areaId: string): string {
   const slug = createSlug(areaName);
   const finalUrl = `/areas/${slug}-${areaId}`;
-  console.log('🔗 Creating area URL:', { areaName, areaId, slug, finalUrl });
   return finalUrl;
 }
 

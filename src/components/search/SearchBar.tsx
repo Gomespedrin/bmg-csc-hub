@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Search, X } from "lucide-react";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useNavigate } from "react-router-dom";
 import { useServicos } from "@/hooks/useServicos";
 import { useAreas } from "@/hooks/useAreas";
@@ -55,9 +55,9 @@ export function SearchBar({
     }
   }, [debouncedValue, onSearchChange]);
 
-  // Generate suggestions from real data
-  const generateSuggestions = (): SearchSuggestion[] => {
-    const allSuggestions: SearchSuggestion[] = [];
+  // Memoizar sugestões para melhor performance
+  const allSuggestions = useMemo(() => {
+    const suggestions: SearchSuggestion[] = [];
 
     try {
       // Add services
@@ -66,7 +66,7 @@ export function SearchBar({
         servicos.forEach((servico: any) => {
           // Verificar se o serviço tem a estrutura esperada
           if (servico && servico.subprocesso && servico.subprocesso.processo && servico.subprocesso.processo.area) {
-            allSuggestions.push({
+            suggestions.push({
               id: servico.id,
               type: "produto",
               title: servico.produto,
@@ -81,7 +81,7 @@ export function SearchBar({
       if (areas && Array.isArray(areas)) {
         areas.forEach(area => {
           if (area && area.id && area.nome) {
-            allSuggestions.push({
+            suggestions.push({
               id: area.id,
               type: "area",
               title: area.nome,
@@ -98,7 +98,7 @@ export function SearchBar({
           if (area && area.processos && Array.isArray(area.processos)) {
             area.processos.forEach(processo => {
               if (processo && processo.id && processo.nome) {
-                allSuggestions.push({
+                suggestions.push({
                   id: processo.id,
                   type: "processo",
                   title: processo.nome,
@@ -130,19 +130,19 @@ export function SearchBar({
           }
         });
         uniqueSubprocesses.forEach(subprocesso => {
-          allSuggestions.push(subprocesso);
+          suggestions.push(subprocesso);
         });
       }
     } catch (error) {
       console.error('Erro ao gerar sugestões de busca:', error);
     }
 
-    return allSuggestions;
-  };
+    return suggestions;
+  }, [servicosData, areas]);
 
+  // Filtrar sugestões baseado no valor de busca
   useEffect(() => {
     if (debouncedValue.length >= 2) {
-      const allSuggestions = generateSuggestions();
       const searchTerm = debouncedValue.toLowerCase();
       
       const filtered = allSuggestions.filter(suggestion => {
@@ -152,12 +152,12 @@ export function SearchBar({
       });
       
       setSuggestions(filtered.slice(0, 8)); // Limit to 8 suggestions
-      setOpen(showSuggestions && filtered.length > 0);
+      setOpen(filtered.length > 0);
     } else {
       setSuggestions([]);
       setOpen(false);
     }
-  }, [debouncedValue, showSuggestions, servicosData, areas]);
+  }, [debouncedValue, allSuggestions]);
 
   const handleSelect = (suggestion: SearchSuggestion) => {
     setValue(suggestion.title);
@@ -200,30 +200,26 @@ export function SearchBar({
 
   return (
     <div className={`relative ${className}`}>
-      <Popover open={open} onOpenChange={setOpen} modal={false}>
+      <Popover open={open && showSuggestions} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <Input
               ref={inputRef}
+              type="text"
               placeholder={placeholder}
               value={value}
               onChange={(e) => setValue(e.target.value)}
               onKeyDown={handleKeyDown}
               onFocus={handleInputFocus}
-              className="pl-10 pr-10 bg-muted/50 border-muted focus:bg-card transition-smooth"
-              autoComplete="off"
+              className="pl-10 pr-10"
             />
             {value && (
               <Button
                 variant="ghost"
                 size="sm"
+                onClick={() => setValue("")}
                 className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
-                onClick={() => {
-                  setValue("");
-                  setOpen(false);
-                  inputRef.current?.focus();
-                }}
               >
                 <X className="h-3 w-3" />
               </Button>

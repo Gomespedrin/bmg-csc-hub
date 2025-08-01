@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -11,52 +11,42 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ViewOptionsSimple } from "@/components/ui/view-options-simple";
+import { ViewOptions, ViewMode } from "@/components/ui/view-options";
 import { 
   Users, 
-  MessageSquare, 
   Settings, 
+  MessageSquare, 
   FileText, 
   Shield, 
   Activity, 
   Plus, 
   Edit, 
   Trash2, 
-  Search, 
-  Filter, 
-  FilterX, 
-  Check, 
-  X, 
-  Clock, 
+  Search,
+  Filter,
+  X,
+  Clock,
+  CheckCircle,
+  XCircle,
   AlertCircle,
-  Eye,
+  ChevronDown,
+  Check,
   Grid3X3,
   List,
-  Calendar,
-  User,
-  Mail,
-  Phone,
-  MapPin,
-  ExternalLink,
-  HelpCircle,
-  Star,
-  TrendingUp,
-  Target,
-  Zap,
   Building2,
   Layers,
   Package,
+  Target,
   Globe,
   Bell,
-  Database,
-  ChevronDown
+  Database
 } from "lucide-react";
 
 type AdminModule = 'usuarios' | 'avaliar-sugestoes' | 'editar-catalogo' | 'faq' | 'configuracoes' | 'auditoria';
@@ -87,12 +77,15 @@ export default function AdminPanel() {
     perfil: '',
     categoria: '',
     area: '',
-    processo: ''
+    processo: '',
+    subprocesso: '',
+    acao: ''
   });
 
   // Estados para visualização
-  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'compact'>('grid');
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [searchTerm, setSearchTerm] = useState('');
+  const [showDetails, setShowDetails] = useState(false);
 
   // Hooks de dados
   const { data: isAdmin, isLoading: isAdminLoading } = useIsAdmin();
@@ -123,6 +116,59 @@ export default function AdminPanel() {
 
   // Estado para módulo do catálogo
   const [catalogoModule, setCatalogoModule] = useState<'areas' | 'processos' | 'subprocessos' | 'servicos'>('areas');
+  
+  // Estados para dados hierárquicos (como na página de sugestões)
+  const [processosHierarquicos, setProcessosHierarquicos] = useState<any[]>([]);
+  const [subprocessosHierarquicos, setSubprocessosHierarquicos] = useState<any[]>([]);
+  
+  // Carregar dados hierárquicos baseado na seleção
+  useEffect(() => {
+    if (formData.area_id && areas) {
+      const areaSelecionada = areas.find(area => area.id === formData.area_id);
+      if (areaSelecionada) {
+        // Filtrar processos da área selecionada
+        const processosDaArea = processos?.filter(processo => 
+          processo.area_id === formData.area_id
+        ) || [];
+        setProcessosHierarquicos(processosDaArea);
+        
+        // Resetar subprocessos quando área muda
+        setFormData(prev => ({
+          ...prev,
+          processo_id: '',
+          subprocesso_id: ''
+        }));
+        setSubprocessosHierarquicos([]);
+      }
+    } else {
+      setProcessosHierarquicos([]);
+      setSubprocessosHierarquicos([]);
+    }
+  }, [formData.area_id, areas, processos]);
+  
+  // Carregar subprocessos baseado no processo selecionado
+  useEffect(() => {
+    if (formData.processo_id && processosHierarquicos.length > 0) {
+      const processoSelecionado = processosHierarquicos.find(processo => 
+        processo.id === formData.processo_id
+      );
+      if (processoSelecionado) {
+        // Filtrar subprocessos do processo selecionado
+        const subprocessosDoProcesso = subprocessos?.filter(subprocesso => 
+          subprocesso.processo_id === formData.processo_id
+        ) || [];
+        setSubprocessosHierarquicos(subprocessosDoProcesso);
+        
+        // Resetar subprocesso quando processo muda
+        setFormData(prev => ({
+          ...prev,
+          subprocesso_id: ''
+        }));
+      }
+    } else {
+      setSubprocessosHierarquicos([]);
+    }
+  }, [formData.processo_id, processosHierarquicos, subprocessos]);
 
   // Dados mockados para demonstração
   const mockUsers = [
@@ -132,15 +178,18 @@ export default function AdminPanel() {
   ];
 
   const mockFAQ = [
-    { id: '1', pergunta: 'Como solicitar um serviço?', resposta: 'Acesse o catálogo e clique no serviço desejado...', categoria: 'Geral' },
-    { id: '2', pergunta: 'Qual o prazo de resposta?', resposta: 'O prazo varia conforme o tipo de serviço...', categoria: 'Prazos' },
-    { id: '3', pergunta: 'Como acompanhar minha solicitação?', resposta: 'Acesse sua área pessoal para acompanhar...', categoria: 'Acompanhamento' },
+    { id: '1', pergunta: 'Como solicitar um serviço?', resposta: 'Acesse o catálogo e clique no serviço desejado. Preencha os dados necessários e envie a solicitação. Você receberá um número de protocolo para acompanhamento.', categoria: 'Geral' },
+    { id: '2', pergunta: 'Qual o prazo de resposta?', resposta: 'O prazo varia conforme o tipo de serviço. Serviços de rotina têm prazo de até 5 dias úteis. Serviços de demanda são analisados em até 48 horas.', categoria: 'Prazos' },
+    { id: '3', pergunta: 'Como acompanhar minha solicitação?', resposta: 'Acesse sua área pessoal e clique em "Minhas Solicitações". Lá você encontrará o status atual e histórico de todas as suas solicitações.', categoria: 'Acompanhamento' },
+    { id: '4', pergunta: 'Como sugerir um novo serviço?', resposta: 'Acesse a seção "Sugerir" no menu principal. Preencha o formulário com os detalhes do serviço que você gostaria de ver implementado.', categoria: 'Suporte' },
   ];
 
   const mockAuditoria = [
-    { id: '1', usuario: { full_name: 'João Silva' }, acao: 'Login', created_at: '2024-01-15 10:30', detalhes: 'Login realizado com sucesso' },
-    { id: '2', usuario: { full_name: 'Maria Santos' }, acao: 'Edição de serviço', created_at: '2024-01-14 15:45', detalhes: 'Serviço "Pagamento" atualizado' },
-    { id: '3', usuario: { full_name: 'Pedro Costa' }, acao: 'Criação de sugestão', created_at: '2024-01-13 09:20', detalhes: 'Nova sugestão criada' },
+    { id: '1', usuario: { full_name: 'João Silva' }, acao: 'Login', created_at: '2024-01-15 10:30', detalhes: 'Login realizado com sucesso', ip: '192.168.1.100' },
+    { id: '2', usuario: { full_name: 'Maria Santos' }, acao: 'Edição de serviço', created_at: '2024-01-14 15:45', detalhes: 'Serviço "Pagamento de Fornecedores" atualizado', ip: '192.168.1.101' },
+    { id: '3', usuario: { full_name: 'Pedro Costa' }, acao: 'Criação de sugestão', created_at: '2024-01-13 09:20', detalhes: 'Nova sugestão criada: "Sistema de Relatórios Avançados"', ip: '192.168.1.102' },
+    { id: '4', usuario: { full_name: 'Ana Oliveira' }, acao: 'Exclusão de área', created_at: '2024-01-12 14:15', detalhes: 'Área "Teste" removida do catálogo', ip: '192.168.1.103' },
+    { id: '5', usuario: { full_name: 'Carlos Mendes' }, acao: 'Aprovação de sugestão', created_at: '2024-01-11 11:30', detalhes: 'Sugestão "Melhoria no Sistema de Notificações" aprovada', ip: '192.168.1.104' },
   ];
 
   // Funções auxiliares
@@ -189,24 +238,41 @@ export default function AdminPanel() {
   const handleEdit = (item: any) => {
     setSelectedItem(item);
     
-    // Limpar dados relacionados que não são colunas da tabela
-    const cleanFormData = { ...item };
+    // Pré-preencher o formulário com os dados do item
+    const formDataToSet = { ...item };
     
-    if (activeModule === 'editar-catalogo') {
-      if (catalogoModule === 'servicos') {
-        // Remover campos relacionados que não são colunas da tabela servicos
-        delete cleanFormData.subprocesso;
-        delete cleanFormData.processo;
-        delete cleanFormData.area;
-      } else if (catalogoModule === 'subprocessos') {
-        delete cleanFormData.processo;
-        delete cleanFormData.area;
-      } else if (catalogoModule === 'processos') {
-        delete cleanFormData.area;
-      }
+    // Para serviços, carregar hierarquia completa
+    if (activeModule === 'editar-catalogo' && catalogoModule === 'servicos') {
+      formDataToSet.subprocesso_id = item.subprocesso_id || '';
+      formDataToSet.processo_id = item.subprocesso?.processo?.id || '';
+      formDataToSet.area_id = item.subprocesso?.processo?.area?.id || '';
+      
+      console.log('🔍 Serviço - subprocesso_id:', formDataToSet.subprocesso_id);
+      console.log('🔍 Serviço - processo_id:', formDataToSet.processo_id);
+      console.log('🔍 Serviço - area_id:', formDataToSet.area_id);
     }
     
-    setFormData(cleanFormData);
+    // Para subprocessos, carregar hierarquia
+    if (activeModule === 'editar-catalogo' && catalogoModule === 'subprocessos') {
+      formDataToSet.processo_id = item.processo_id || '';
+      formDataToSet.area_id = item.processo?.area?.id || '';
+      
+      console.log('🔍 Subprocesso - processo_id:', formDataToSet.processo_id);
+      console.log('🔍 Subprocesso - area_id:', formDataToSet.area_id);
+    }
+    
+    // Para processos, carregar área
+    if (activeModule === 'editar-catalogo' && catalogoModule === 'processos') {
+      formDataToSet.area_id = item.area_id || '';
+      
+      console.log('🔍 Processo - area_id:', formDataToSet.area_id);
+    }
+    
+    console.log('🔍 handleEdit - item:', item);
+    console.log('🔍 handleEdit - formDataToSet:', formDataToSet);
+    console.log('🔍 handleEdit - catalogoModule:', catalogoModule);
+    
+    setFormData(formDataToSet);
     setIsEditDialogOpen(true);
   };
 
@@ -230,15 +296,16 @@ export default function AdminPanel() {
     e.preventDefault();
     
     try {
-      // Implementar lógica de criação/edição baseada no módulo ativo
-      setIsCreateDialogOpen(false);
-      setIsEditDialogOpen(false);
-      setFormData({});
-      setSelectedItem(null);
+      // Implementar lógica de salvamento baseada no módulo ativo
       toast({
         title: "Sucesso",
         description: `Item ${isCreateDialogOpen ? 'criado' : 'atualizado'} com sucesso.`,
       });
+      
+      setIsCreateDialogOpen(false);
+      setIsEditDialogOpen(false);
+      setFormData({});
+      setSelectedItem(null);
     } catch (error) {
       toast({
         title: "Erro",
@@ -258,7 +325,9 @@ export default function AdminPanel() {
       perfil: '',
       categoria: '',
       area: '',
-      processo: ''
+      processo: '',
+      subprocesso: '',
+      acao: ''
     });
     setSearchTerm('');
   };
@@ -339,7 +408,7 @@ export default function AdminPanel() {
       case 'pendente':
         return <Badge variant="secondary">Pendente</Badge>;
       case 'aprovada':
-        return <Badge variant="default" className="bg-green-500">Aprovada</Badge>;
+        return <Badge variant="default">Aprovada</Badge>;
       case 'rejeitada':
         return <Badge variant="destructive">Rejeitada</Badge>;
       default:
@@ -412,65 +481,86 @@ export default function AdminPanel() {
     e.preventDefault();
     
     try {
-      // Limpar dados relacionados antes de enviar
+      // Preparar dados para envio
       const cleanFormData = { ...formData };
       
+      // Remover campos que não devem ser enviados
+      delete cleanFormData.subprocesso;
+      delete cleanFormData.processo;
+      delete cleanFormData.area;
+      
+      // Remover campos que são apenas para pré-seleção
       if (catalogoModule === 'servicos') {
-        delete cleanFormData.subprocesso;
-        delete cleanFormData.processo;
-        delete cleanFormData.area;
+        delete cleanFormData.processo_id;
+        delete cleanFormData.area_id;
       } else if (catalogoModule === 'subprocessos') {
-        delete cleanFormData.processo;
-        delete cleanFormData.area;
-      } else if (catalogoModule === 'processos') {
-        delete cleanFormData.area;
+        delete cleanFormData.area_id;
       }
+      
+      console.log('🔍 handleCatalogoSubmit - cleanFormData:', cleanFormData);
+      
+      let result;
       
       if (isCreateDialogOpen) {
         switch (catalogoModule) {
           case 'areas':
-            await createArea.mutateAsync(cleanFormData);
+            result = await createArea.mutateAsync(cleanFormData);
             break;
           case 'processos':
-            await createProcesso.mutateAsync(cleanFormData);
+            result = await createProcesso.mutateAsync(cleanFormData);
             break;
           case 'subprocessos':
-            await createSubprocesso.mutateAsync(cleanFormData);
+            result = await createSubprocesso.mutateAsync(cleanFormData);
             break;
           case 'servicos':
-            await createServico.mutateAsync(cleanFormData);
+            result = await createServico.mutateAsync(cleanFormData);
             break;
+          default:
+            throw new Error('Módulo de catálogo não reconhecido');
         }
       } else {
         switch (catalogoModule) {
           case 'areas':
-            await updateArea.mutateAsync({ id: selectedItem.id, ...cleanFormData });
+            result = await updateArea.mutateAsync({ id: selectedItem.id, ...cleanFormData });
             break;
           case 'processos':
-            await updateProcesso.mutateAsync({ id: selectedItem.id, ...cleanFormData });
+            result = await updateProcesso.mutateAsync({ id: selectedItem.id, ...cleanFormData });
             break;
           case 'subprocessos':
-            await updateSubprocesso.mutateAsync({ id: selectedItem.id, ...cleanFormData });
+            result = await updateSubprocesso.mutateAsync({ id: selectedItem.id, ...cleanFormData });
             break;
           case 'servicos':
-            await updateServico.mutateAsync({ id: selectedItem.id, ...cleanFormData });
+            result = await updateServico.mutateAsync({ id: selectedItem.id, ...cleanFormData });
             break;
+          default:
+            throw new Error('Módulo de catálogo não reconhecido');
         }
       }
       
+      // Invalidar todas as queries relacionadas
+      const queriesToInvalidate = [
+        'admin-areas', 'admin-processos', 'admin-subprocessos', 'admin-servicos',
+        'areas', 'processos', 'subprocessos', 'servicos'
+      ];
+      
+      for (const queryKey of queriesToInvalidate) {
+        await queryClient.invalidateQueries({ queryKey: [queryKey] });
+      }
+      
+      // Fechar diálogos e limpar formulário
       setIsCreateDialogOpen(false);
       setIsEditDialogOpen(false);
       setFormData({});
       setSelectedItem(null);
+      
       toast({
         title: "Sucesso",
         description: `Item ${isCreateDialogOpen ? 'criado' : 'atualizado'} com sucesso.`,
       });
     } catch (error) {
-      console.error('Erro ao salvar:', error);
       toast({
         title: "Erro",
-        description: "Erro ao salvar o item.",
+        description: `Erro ao salvar o item: ${error instanceof Error ? error.message : 'Erro desconhecido'}`,
         variant: "destructive",
       });
     }
@@ -487,8 +577,100 @@ export default function AdminPanel() {
     }
   };
 
-  const renderModuleContent = () => {
+  const getFilteredData = () => {
     const data = getModuleData();
+    
+    return data.filter(item => {
+      // Filtro de busca
+      const matchesSearch = !searchTerm || 
+        (activeModule === 'usuarios' && 'full_name' in item && (
+          (item as any).full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (item as any).email?.toLowerCase().includes(searchTerm.toLowerCase())
+        )) ||
+        (activeModule === 'faq' && 'pergunta' in item && (
+          (item as any).pergunta?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (item as any).resposta?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (item as any).categoria?.toLowerCase().includes(searchTerm.toLowerCase())
+        )) ||
+        (activeModule === 'auditoria' && 'usuario' in item && (
+          (item as any).usuario?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (item as any).acao?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (item as any).detalhes?.toLowerCase().includes(searchTerm.toLowerCase())
+        )) ||
+        (activeModule === 'avaliar-sugestoes' && 'dados_sugeridos' in item && 'justificativa' in item && (
+          (item as any).dados_sugeridos?.produto?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (item as any).dados_sugeridos?.area?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (item as any).justificativa?.toLowerCase().includes(searchTerm.toLowerCase())
+        )) ||
+        (activeModule === 'avaliar-sugestoes' && 'tipo' in item && 'created_at' in item && (
+          (item as any).tipo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (item as any).created_at?.toLowerCase().includes(searchTerm.toLowerCase())
+        )) ||
+        (activeModule === 'editar-catalogo' && (
+          // Busca para áreas
+          (catalogoModule === 'areas' && 'nome' in item && (item as any).nome?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+          // Busca para processos
+          (catalogoModule === 'processos' && 'nome' in item && (
+            (item as any).nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (item as any).area?.nome?.toLowerCase().includes(searchTerm.toLowerCase())
+          )) ||
+          // Busca para subprocessos
+          (catalogoModule === 'subprocessos' && 'nome' in item && (
+            (item as any).nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (item as any).processo?.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (item as any).processo?.area?.nome?.toLowerCase().includes(searchTerm.toLowerCase())
+          )) ||
+          // Busca para serviços
+          (catalogoModule === 'servicos' && 'produto' in item && (
+            (item as any).produto?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (item as any).subprocesso?.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (item as any).subprocesso?.processo?.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (item as any).subprocesso?.processo?.area?.nome?.toLowerCase().includes(searchTerm.toLowerCase())
+          ))
+        ));
+
+      // Filtros específicos por módulo
+      const matchesFilters = 
+        (activeModule === 'usuarios' && 'perfil' in item && (
+          (!filters.perfil || filters.perfil === 'todos' || (item as any).perfil === filters.perfil) &&
+          (!filters.status || filters.status === 'todos' || (item as any).ativo === (filters.status === 'ativo'))
+        )) ||
+        (activeModule === 'faq' && 'categoria' in item && (
+          !filters.categoria || filters.categoria === 'todas' || (item as any).categoria === filters.categoria
+        )) ||
+        (activeModule === 'auditoria' && 'acao' in item && (
+          !filters.acao || filters.acao === 'todas' || (item as any).acao === filters.acao
+        )) ||
+        (activeModule === 'avaliar-sugestoes' && 'status' in item && 'tipo' in item && (
+          (!filters.status || filters.status === 'todos' || (item as any).status === filters.status) &&
+          (!filters.tipo || filters.tipo === 'todos' || (item as any).tipo === filters.tipo)
+        )) ||
+        (activeModule === 'editar-catalogo' && (
+          // Filtro de status para catálogo
+          (!filters.status || filters.status === 'todos' || (item as any).ativo === (filters.status === 'ativo')) &&
+          // Filtro de área para processos, subprocessos e serviços
+          (!filters.area || filters.area === 'todas' || 
+            (catalogoModule === 'processos' && (item as any).area?.id === filters.area) ||
+            (catalogoModule === 'subprocessos' && (item as any).processo?.area?.id === filters.area) ||
+            (catalogoModule === 'servicos' && (item as any).subprocesso?.processo?.area?.id === filters.area)
+          ) &&
+          // Filtro de processo para subprocessos e serviços
+          (!filters.processo || filters.processo === 'todos' ||
+            (catalogoModule === 'subprocessos' && (item as any).processo?.id === filters.processo) ||
+            (catalogoModule === 'servicos' && (item as any).subprocesso?.processo?.id === filters.processo)
+          ) &&
+          // Filtro de subprocesso para serviços
+          (!filters.subprocesso || filters.subprocesso === 'todos' ||
+            (catalogoModule === 'servicos' && (item as any).subprocesso?.id === filters.subprocesso)
+          )
+        ));
+
+      return matchesSearch && matchesFilters;
+    });
+  };
+
+  const renderModuleContent = () => {
+    const data = getFilteredData();
     
     // Verificar se não é administrador
     if (!isAdminLoading && !isAdmin) {
@@ -515,25 +697,6 @@ export default function AdminPanel() {
         aprovadas: sugestoes?.filter(s => s.status === 'aprovada').length || 0,
         rejeitadas: sugestoes?.filter(s => s.status === 'rejeitada').length || 0
       };
-
-      // Aplicar filtros às sugestões
-      const filteredSugestoes = sugestoes?.filter(sugestao => {
-        const matchesStatus = !filters.status || filters.status === 'todos' || sugestao.status === filters.status;
-        const matchesTipo = !filters.tipo || filters.tipo === 'todos' || sugestao.tipo === filters.tipo;
-        const matchesSearch = !filters.search || 
-          sugestao.dados_sugeridos.produto?.toLowerCase().includes(filters.search.toLowerCase()) ||
-          sugestao.dados_sugeridos.area?.toLowerCase().includes(filters.search.toLowerCase()) ||
-          sugestao.justificativa?.toLowerCase().includes(filters.search.toLowerCase());
-        
-        const data = new Date(sugestao.created_at);
-        const dataInicio = filters.dataInicio ? new Date(filters.dataInicio) : null;
-        const dataFim = filters.dataFim ? new Date(filters.dataFim) : null;
-        
-        const matchesDataInicio = !dataInicio || data >= dataInicio;
-        const matchesDataFim = !dataFim || data <= dataFim;
-        
-        return matchesStatus && matchesTipo && matchesSearch && matchesDataInicio && matchesDataFim;
-      }) || [];
 
       if (sugestoesLoading) {
         return (
@@ -579,7 +742,7 @@ export default function AdminPanel() {
               <CardContent className="p-6">
                 <div className="flex items-center space-x-3">
                   <div className="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center">
-                    <Check className="h-5 w-5 text-green-500" />
+                    <CheckCircle className="h-5 w-5 text-green-500" />
                   </div>
                   <div>
                     <p className="text-2xl font-bold">{stats.aprovadas}</p>
@@ -593,7 +756,7 @@ export default function AdminPanel() {
               <CardContent className="p-6">
                 <div className="flex items-center space-x-3">
                   <div className="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center">
-                    <X className="h-5 w-5 text-red-500" />
+                    <XCircle className="h-5 w-5 text-red-500" />
                   </div>
                   <div>
                     <p className="text-2xl font-bold">{stats.rejeitadas}</p>
@@ -604,220 +767,67 @@ export default function AdminPanel() {
             </Card>
           </div>
 
-          {/* Filtros e ViewOptions */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center space-x-2">
-                    <Filter className="h-5 w-5" />
-                    <span>Filtros e Busca</span>
-                  </CardTitle>
-                  <CardDescription>
-                    Filtre e busque sugestões específicas
-                  </CardDescription>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <ViewOptionsSimple
-                    viewMode={viewMode}
-                    onViewModeChange={setViewMode}
-                  />
-                  <Button 
-                    variant={showFilters ? "default" : "outline"} 
-                    size="sm"
-                    onClick={() => setShowFilters(!showFilters)}
-                  >
-                    <Filter className="mr-2 h-4 w-4" />
-                    Filtros
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={clearFilters}>
-                    <FilterX className="mr-2 h-4 w-4" />
-                    Limpar
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            
-            {showFilters && (
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                  <div>
-                    <Label className="text-sm font-medium mb-2 block">Buscar</Label>
-                    <Input
-                      placeholder="Buscar por título, área, justificativa..."
-                      value={filters.search || ''}
-                      onChange={(e) => setFilters({...filters, search: e.target.value})}
-                    />
-                  </div>
-
-                  <div>
-                    <Label className="text-sm font-medium mb-2 block">Status</Label>
-                    <Select value={filters.status || ''} onValueChange={(value) => setFilters({...filters, status: value})}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Todos os status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="todos">Todos os status</SelectItem>
-                        <SelectItem value="pendente">Pendente</SelectItem>
-                        <SelectItem value="aprovada">Aprovada</SelectItem>
-                        <SelectItem value="rejeitada">Rejeitada</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label className="text-sm font-medium mb-2 block">Tipo</Label>
-                    <Select value={filters.tipo || ''} onValueChange={(value) => setFilters({...filters, tipo: value})}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Todos os tipos" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="todos">Todos os tipos</SelectItem>
-                        <SelectItem value="novo">Novo Serviço</SelectItem>
-                        <SelectItem value="melhoria">Melhoria</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label className="text-sm font-medium mb-2 block">Data Início</Label>
-                    <Input
-                      type="date"
-                      value={filters.dataInicio || ''}
-                      onChange={(e) => setFilters({...filters, dataInicio: e.target.value})}
-                    />
-                  </div>
-
-                  <div>
-                    <Label className="text-sm font-medium mb-2 block">Data Fim</Label>
-                    <Input
-                      type="date"
-                      value={filters.dataFim || ''}
-                      onChange={(e) => setFilters({...filters, dataFim: e.target.value})}
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            )}
-          </Card>
-
-          {/* Sugestões */}
+          {/* Lista de Sugestões */}
           <div className="space-y-4">
-            {!filteredSugestoes || filteredSugestoes.length === 0 ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-semibold text-foreground mb-2">
-                    Nenhuma sugestão encontrada
-                  </h3>
-                  <p className="text-muted-foreground text-center">
-                    {filters.search || filters.status || filters.tipo || filters.dataInicio || filters.dataFim
-                      ? "Tente ajustar os filtros para encontrar sugestões."
-                      : "Ainda não há sugestões para avaliar."}
-                  </p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'space-y-4'}>
-                {filteredSugestoes.map((sugestao) => (
-                  <Card key={sugestao.id} className={viewMode === 'compact' ? 'p-4' : ''}>
-                    <CardHeader className={viewMode === 'compact' ? 'p-0 pb-2' : ''}>
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <CardTitle className="text-lg">
-                            {sugestao.dados_sugeridos.produto || 'Sugestão de Serviço'}
-                          </CardTitle>
-                          <CardDescription className="mt-1">
-                            {sugestao.dados_sugeridos.area && (
-                              <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded mr-2">
-                                {sugestao.dados_sugeridos.area}
-                              </span>
-                            )}
-                            {sugestao.tipo && (
-                              <span className="inline-block bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded">
-                                {sugestao.tipo === 'novo' ? 'Novo Serviço' : 'Melhoria'}
-                              </span>
-                            )}
-                          </CardDescription>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          {getStatusBadge(sugestao.status)}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setSelectedSugestao(sugestao)}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </div>
+            {data.map((sugestao) => (
+              <Card key={sugestao.id} className="hover:shadow-md transition-shadow">
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <div className="space-y-1">
+                      <CardTitle className="text-xl">
+                        {sugestao.dados_sugeridos?.produto || 'Nova Sugestão'}
+                      </CardTitle>
+                      <CardDescription>
+                        Área: {sugestao.dados_sugeridos?.area} • Tipo: {sugestao.tipo} • 
+                        Criado em: {formatDate(sugestao.created_at)}
+                      </CardDescription>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        {sugestao.justificativa}
+                      </p>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      {getStatusBadge(sugestao.status)}
+                      <div className="flex space-x-1">
+                        {sugestao.status === 'pendente' && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleApprove(sugestao.id)}
+                              className="text-green-600 hover:text-green-700"
+                            >
+                              <CheckCircle className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleReject(sugestao.id)}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <XCircle className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleEdit(sugestao)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
                       </div>
-                    </CardHeader>
-                    
-                    {viewMode !== 'compact' && (
-                      <CardContent>
-                        <div className="space-y-3">
-                          {sugestao.dados_sugeridos.o_que_e && (
-                            <div>
-                              <Label className="text-sm font-medium">O que é:</Label>
-                              <p className="text-sm text-muted-foreground mt-1">
-                                {sugestao.dados_sugeridos.o_que_e}
-                              </p>
-                            </div>
-                          )}
-                          
-                          {sugestao.justificativa && (
-                            <div>
-                              <Label className="text-sm font-medium">Justificativa:</Label>
-                              <p className="text-sm text-muted-foreground mt-1">
-                                {sugestao.justificativa}
-                              </p>
-                            </div>
-                          )}
-                          
-                          <div className="flex items-center justify-between text-sm text-muted-foreground">
-                            <span>Criado em: {formatDate(sugestao.created_at)}</span>
-                            {sugestao.status === 'pendente' && (
-                              <div className="flex space-x-2">
-                                <Button
-                                  size="sm"
-                                  onClick={() => {
-                                    setSelectedSugestao(sugestao);
-                                    setComentarioAdmin('');
-                                  }}
-                                  disabled={processingId === sugestao.id}
-                                >
-                                  <Check className="h-4 w-4 mr-1" />
-                                  Aprovar
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    setSelectedSugestao(sugestao);
-                                    setJustificativaRejeicao('');
-                                  }}
-                                  disabled={processingId === sugestao.id}
-                                >
-                                  <X className="h-4 w-4 mr-1" />
-                                  Rejeitar
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </CardContent>
-                    )}
-                  </Card>
-                ))}
-              </div>
-            )}
+                    </div>
+                  </div>
+                </CardHeader>
+              </Card>
+            ))}
           </div>
         </div>
       );
     }
 
     if (activeModule === 'editar-catalogo') {
-      const catalogoData = getCatalogoData();
+      const data = getFilteredData();
       const isLoading = areasLoading || processosLoading || subprocessosLoading || servicosLoading;
 
       return (
@@ -884,7 +894,7 @@ export default function AdminPanel() {
             </div>
 
             {/* Barra de Pesquisa e Filtros */}
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center gap-3">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -894,88 +904,142 @@ export default function AdminPanel() {
                   className="pl-10"
                 />
               </div>
+              
               <Button
                 variant="outline"
+                size="sm"
                 onClick={() => setShowFilters(!showFilters)}
                 className={showFilters ? 'bg-primary text-primary-foreground' : ''}
               >
-                <Filter className="mr-2 h-4 w-4" />
+                <Filter className="mr-1 h-4 w-4" />
                 Filtros
               </Button>
+              
+              <ViewOptions
+                viewMode={viewMode}
+                onViewModeChange={setViewMode}
+                showDetails={showDetails}
+                onShowDetailsChange={setShowDetails}
+              />
+              
               {(Object.keys(filters).length > 0 || searchTerm) && (
-                <Button variant="outline" onClick={clearFilters}>
-                  <X className="mr-2 h-4 w-4" />
+                <Button variant="outline" size="sm" onClick={clearFilters}>
+                  <X className="mr-1 h-4 w-4" />
                   Limpar
                 </Button>
               )}
             </div>
 
-            {/* Painel de Filtros */}
+            {/* Filtros Inline */}
             {showFilters && (
-              <Card className="p-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <Label>Status</Label>
+              <div className="flex items-center gap-4 p-2 bg-muted/20 rounded border">
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs font-medium">Status:</Label>
+                  <Select
+                    value={filters.status || ''}
+                    onValueChange={(value) => setFilters({ ...filters, status: value })}
+                  >
+                    <SelectTrigger className="w-24 h-7 text-xs">
+                      <SelectValue placeholder="Todos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos</SelectItem>
+                      <SelectItem value="ativo">Ativo</SelectItem>
+                      <SelectItem value="inativo">Inativo</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {catalogoModule !== 'areas' && (
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs font-medium">Área:</Label>
                     <Select
-                      value={filters.status || ''}
-                      onValueChange={(value) => setFilters({ ...filters, status: value })}
+                      value={filters.area || ''}
+                      onValueChange={(value) => {
+                        // Reset processo and subprocesso when area changes
+                        setFilters({ 
+                          ...filters, 
+                          area: value, 
+                          processo: value === 'todas' ? '' : filters.processo,
+                          subprocesso: value === 'todas' ? '' : filters.subprocesso
+                        });
+                      }}
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Todos os status" />
+                      <SelectTrigger className="w-32 h-7 text-xs">
+                        <SelectValue placeholder="Todas" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Todos os status</SelectItem>
-                        <SelectItem value="ativo">Ativo</SelectItem>
-                        <SelectItem value="inativo">Inativo</SelectItem>
+                        <SelectItem value="todas">Todas</SelectItem>
+                        {areas?.map((area) => (
+                          <SelectItem key={area.id} value={area.id}>
+                            {area.nome}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
+                )}
 
-                  {catalogoModule !== 'areas' && (
-                    <div>
-                      <Label>Área</Label>
-                      <Select
-                        value={filters.area || ''}
-                        onValueChange={(value) => setFilters({ ...filters, area: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Todas as áreas" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="">Todas as áreas</SelectItem>
-                          {areas?.map((area) => (
-                            <SelectItem key={area.id} value={area.id}>
-                              {area.nome}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
+                {(catalogoModule === 'subprocessos' || catalogoModule === 'servicos') && (
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs font-medium">Processo:</Label>
+                    <Select
+                      value={filters.processo || ''}
+                      onValueChange={(value) => {
+                        // Reset subprocesso when processo changes
+                        setFilters({ 
+                          ...filters, 
+                          processo: value,
+                          subprocesso: value === 'todos' ? '' : filters.subprocesso
+                        });
+                      }}
+                    >
+                      <SelectTrigger className="w-40 h-7 text-xs">
+                        <SelectValue placeholder="Todos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos</SelectItem>
+                        {processos?.filter(processo => 
+                          !filters.area || filters.area === 'todas' || processo.area?.id === filters.area
+                        ).map((processo) => (
+                          <SelectItem key={processo.id} value={processo.id}>
+                            {processo.area?.nome} → {processo.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
-                  {(catalogoModule === 'subprocessos' || catalogoModule === 'servicos') && (
-                    <div>
-                      <Label>Processo</Label>
-                      <Select
-                        value={filters.processo || ''}
-                        onValueChange={(value) => setFilters({ ...filters, processo: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Todos os processos" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="">Todos os processos</SelectItem>
-                          {processos?.map((processo) => (
-                            <SelectItem key={processo.id} value={processo.id}>
-                              {processo.area?.nome} → {processo.nome}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                </div>
-              </Card>
+                {catalogoModule === 'servicos' && (
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs font-medium">Subprocesso:</Label>
+                    <Select
+                      value={filters.subprocesso || ''}
+                      onValueChange={(value) => setFilters({ ...filters, subprocesso: value })}
+                    >
+                      <SelectTrigger className="w-44 h-7 text-xs">
+                        <SelectValue placeholder="Todos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos</SelectItem>
+                        {subprocessos?.filter(subprocesso => {
+                          // Filter by selected area and processo
+                          const matchesArea = !filters.area || filters.area === 'todas' || 
+                            subprocesso.processo?.area?.id === filters.area;
+                          const matchesProcesso = !filters.processo || filters.processo === 'todos' || 
+                            subprocesso.processo?.id === filters.processo;
+                          return matchesArea && matchesProcesso;
+                        }).map((subprocesso) => (
+                          <SelectItem key={subprocesso.id} value={subprocesso.id}>
+                            {subprocesso.processo?.area?.nome} → {subprocesso.processo?.nome} → {subprocesso.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
             )}
 
             {/* Lista de Itens */}
@@ -984,50 +1048,64 @@ export default function AdminPanel() {
                 <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
               </div>
             ) : (
-              <div className="grid gap-4">
-                {catalogoData.map((item) => (
-                  <Card key={item.id} className="hover:shadow-md transition-shadow">
-                    <CardHeader>
+              <div className={
+                viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4' :
+                viewMode === 'list' ? 'space-y-4' :
+                viewMode === 'compact' ? 'grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-2' :
+                'space-y-2'
+              }>
+                {data.map((item) => (
+                  <Card key={item.id} className={`hover:shadow-md transition-shadow ${
+                    viewMode === 'compact' ? 'p-2' : ''
+                  }`}>
+                    <CardHeader className={viewMode === 'compact' ? 'p-2' : ''}>
                       <div className="flex items-start justify-between">
-                        <div className="space-y-1">
-                          <CardTitle className="text-xl">
+                        <div className="space-y-1 flex-1 min-w-0">
+                          <CardTitle className={`${
+                            viewMode === 'list' ? 'text-lg' : 
+                            viewMode === 'compact' ? 'text-xs' : 
+                            'text-xl'
+                          } ${viewMode === 'compact' ? 'whitespace-nowrap overflow-hidden text-ellipsis' : 'break-words'} leading-tight`}>
                             {catalogoModule === 'servicos' ? item.produto : item.nome}
                           </CardTitle>
-                          <CardDescription>
-                            {catalogoModule === 'servicos' && (
-                              <>
-                                {item.subprocesso?.processo?.area?.nome} → {item.subprocesso?.processo?.nome} → {item.subprocesso?.nome}
-                              </>
-                            )}
-                            {catalogoModule === 'subprocessos' && (
-                              <>
-                                {item.processo?.area?.nome} → {item.processo?.nome}
-                              </>
-                            )}
-                            {catalogoModule === 'processos' && (
-                              <>
-                                {item.area?.nome}
-                              </>
-                            )}
-                            {catalogoModule === 'areas' && item.descricao}
-                          </CardDescription>
+                          {viewMode !== 'compact' && (
+                            <CardDescription className="break-words">
+                              {catalogoModule === 'servicos' && (
+                                <>
+                                  {item.subprocesso?.processo?.area?.nome} → {item.subprocesso?.processo?.nome} → {item.subprocesso?.nome}
+                                </>
+                              )}
+                              {catalogoModule === 'subprocessos' && (
+                                <>
+                                  {item.processo?.area?.nome} → {item.processo?.nome}
+                                </>
+                              )}
+                              {catalogoModule === 'processos' && (
+                                <>
+                                  {item.area?.nome}
+                                </>
+                              )}
+                              {catalogoModule === 'areas' && item.descricao}
+                            </CardDescription>
+                          )}
                         </div>
-                        <div className="flex items-center space-x-2">
-                          <Badge variant={item.ativo ? 'default' : 'secondary'}>
+                        <div className="flex items-center space-x-2 flex-shrink-0 ml-2">
+                          <Badge variant={item.ativo ? 'default' : 'secondary'} className={viewMode === 'compact' ? 'text-xs px-1' : ''}>
                             {item.ativo ? 'Ativo' : 'Inativo'}
                           </Badge>
                           <div className="flex space-x-1">
                             <Button
-                              size="sm"
+                              size={viewMode === 'compact' ? 'sm' : 'sm'}
                               variant="outline"
                               onClick={() => handleEdit(item)}
+                              className={viewMode === 'compact' ? 'h-6 w-6 p-0' : ''}
                             >
-                              <Edit className="h-4 w-4" />
+                              <Edit className={viewMode === 'compact' ? 'h-3 w-3' : 'h-4 w-4'} />
                             </Button>
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
-                                <Button size="sm" variant="outline">
-                                  <Trash2 className="h-4 w-4" />
+                                <Button size={viewMode === 'compact' ? 'sm' : 'sm'} variant="outline" className={viewMode === 'compact' ? 'h-6 w-6 p-0' : ''}>
+                                  <Trash2 className={viewMode === 'compact' ? 'h-3 w-3' : 'h-4 w-4'} />
                                 </Button>
                               </AlertDialogTrigger>
                               <AlertDialogContent>
@@ -1049,20 +1127,20 @@ export default function AdminPanel() {
                         </div>
                       </div>
                     </CardHeader>
-                    {catalogoModule === 'servicos' && (
-                      <CardContent>
+                    {(catalogoModule === 'servicos' && (viewMode === 'grid' || viewMode === 'detailed' || showDetails)) && (
+                      <CardContent className={viewMode === 'compact' ? 'p-2' : ''}>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                           <div className="flex items-center space-x-2">
                             <Users className="h-4 w-4 text-muted-foreground" />
-                            <span>{item.quem_pode_utilizar || 'Não informado'}</span>
+                            <span className="truncate">{item.quem_pode_utilizar || 'Não informado'}</span>
                           </div>
                           <div className="flex items-center space-x-2">
                             <Clock className="h-4 w-4 text-muted-foreground" />
-                            <span>{item.tempo_medio ? `${item.tempo_medio} ${item.unidade_medida}` : 'Não informado'}</span>
+                            <span className="truncate">{item.tempo_medio ? `${item.tempo_medio} ${item.unidade_medida}` : 'Não informado'}</span>
                           </div>
                           <div className="flex items-center space-x-2">
                             <Target className="h-4 w-4 text-muted-foreground" />
-                            <span>{item.sla ? `${item.sla}h` : 'Não informado'}</span>
+                            <span className="truncate">{item.sla ? `${item.sla}h` : 'Não informado'}</span>
                           </div>
                         </div>
                       </CardContent>
@@ -1233,6 +1311,12 @@ export default function AdminPanel() {
             <Filter className="mr-2 h-4 w-4" />
             Filtros
           </Button>
+          <ViewOptions
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            showDetails={showDetails}
+            onShowDetailsChange={setShowDetails}
+          />
           {(Object.keys(filters).length > 0 || searchTerm) && (
             <Button variant="outline" onClick={clearFilters}>
               <X className="mr-2 h-4 w-4" />
@@ -1250,10 +1334,10 @@ export default function AdminPanel() {
         {/* Painel de Filtros */}
         {showFilters && (
           <Card className="p-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="flex flex-wrap gap-4">
               {activeModule === 'usuarios' && (
                 <>
-                  <div>
+                  <div className="flex-1 min-w-[200px]">
                     <Label>Perfil</Label>
                     <Select
                       value={filters.perfil || ''}
@@ -1263,14 +1347,14 @@ export default function AdminPanel() {
                         <SelectValue placeholder="Todos os perfis" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Todos os perfis</SelectItem>
+                        <SelectItem value="todos">Todos os perfis</SelectItem>
                         <SelectItem value="usuario">Usuário</SelectItem>
                         <SelectItem value="administrador">Administrador</SelectItem>
                         <SelectItem value="superadministrador">Super Administrador</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                  <div>
+                  <div className="flex-1 min-w-[200px]">
                     <Label>Status</Label>
                     <Select
                       value={filters.status || ''}
@@ -1280,7 +1364,7 @@ export default function AdminPanel() {
                         <SelectValue placeholder="Todos os status" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Todos os status</SelectItem>
+                        <SelectItem value="todos">Todos os status</SelectItem>
                         <SelectItem value="ativo">Ativo</SelectItem>
                         <SelectItem value="inativo">Inativo</SelectItem>
                       </SelectContent>
@@ -1290,7 +1374,7 @@ export default function AdminPanel() {
               )}
 
               {activeModule === 'faq' && (
-                <div>
+                <div className="flex-1 min-w-[200px]">
                   <Label>Categoria</Label>
                   <Select
                     value={filters.categoria || ''}
@@ -1300,11 +1384,33 @@ export default function AdminPanel() {
                       <SelectValue placeholder="Todas as categorias" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Todas as categorias</SelectItem>
+                      <SelectItem value="todas">Todas as categorias</SelectItem>
                       <SelectItem value="Geral">Geral</SelectItem>
                       <SelectItem value="Prazos">Prazos</SelectItem>
                       <SelectItem value="Acompanhamento">Acompanhamento</SelectItem>
                       <SelectItem value="Suporte">Suporte</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {activeModule === 'auditoria' && (
+                <div className="flex-1 min-w-[200px]">
+                  <Label>Ação</Label>
+                  <Select
+                    value={filters.acao || ''}
+                    onValueChange={(value) => setFilters({ ...filters, acao: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Todas as ações" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todas">Todas as ações</SelectItem>
+                      <SelectItem value="Login">Login</SelectItem>
+                      <SelectItem value="Edição de serviço">Edição de serviço</SelectItem>
+                      <SelectItem value="Criação de sugestão">Criação de sugestão</SelectItem>
+                      <SelectItem value="Exclusão de área">Exclusão de área</SelectItem>
+                      <SelectItem value="Aprovação de sugestão">Aprovação de sugestão</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1314,46 +1420,46 @@ export default function AdminPanel() {
         )}
 
         {/* Lista de Itens */}
-        <div className="grid gap-4">
+        <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4' : 'space-y-4'}>
           {data.map((item) => (
             <Card key={item.id} className="hover:shadow-md transition-shadow">
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="space-y-1">
                     <CardTitle className="text-xl">
-                      {activeModule === 'usuarios' && item.nome}
-                      {activeModule === 'faq' && item.pergunta}
-                      {activeModule === 'auditoria' && `${item.usuario?.full_name || 'Usuário'} - ${item.acao}`}
+                      {activeModule === 'usuarios' && 'full_name' in item && (item as any).full_name}
+                      {activeModule === 'faq' && 'pergunta' in item && (item as any).pergunta}
+                      {activeModule === 'auditoria' && 'usuario' in item && `${(item as any).usuario?.full_name || 'Usuário'} - ${(item as any).acao}`}
                     </CardTitle>
-                    <CardDescription>
-                      {activeModule === 'usuarios' && (
-                        <>
-                          {item.email} • {item.perfil} • Criado em: {new Date(item.created_at).toLocaleDateString()}
-                        </>
-                      )}
-                      {activeModule === 'faq' && (
-                        <>
-                          {item.categoria} • {item.resposta.substring(0, 100)}...
-                        </>
-                      )}
-                      {activeModule === 'auditoria' && (
-                        <>
-                          {new Date(item.created_at).toLocaleString()} • {item.detalhes}
-                        </>
-                      )}
-                    </CardDescription>
+                                          <CardDescription>
+                        {activeModule === 'usuarios' && 'email' in item && (
+                          <>
+                            {(item as any).email} • {(item as any).perfil} • Criado em: {new Date((item as any).created_at).toLocaleDateString()}
+                          </>
+                        )}
+                        {activeModule === 'faq' && 'categoria' in item && (
+                          <>
+                            {(item as any).categoria} • {(item as any).resposta.substring(0, 100)}...
+                          </>
+                        )}
+                        {activeModule === 'auditoria' && 'created_at' in item && (
+                          <>
+                            {formatDate((item as any).created_at)} • {(item as any).detalhes}
+                          </>
+                        )}
+                      </CardDescription>
                   </div>
                   <div className="flex items-center space-x-2">
-                    {activeModule === 'usuarios' && (
-                      <Badge variant={item.ativo ? 'default' : 'secondary'}>
-                        {item.ativo ? 'Ativo' : 'Inativo'}
+                    {activeModule === 'usuarios' && 'ativo' in item && (
+                      <Badge variant={(item as any).ativo ? 'default' : 'secondary'}>
+                        {(item as any).ativo ? 'Ativo' : 'Inativo'}
                       </Badge>
                     )}
-                    {activeModule === 'faq' && (
-                      <Badge variant="outline">{item.categoria}</Badge>
+                    {activeModule === 'faq' && 'categoria' in item && (
+                      <Badge variant="outline">{(item as any).categoria}</Badge>
                     )}
-                    {activeModule === 'auditoria' && (
-                      <Badge variant="outline">{item.acao}</Badge>
+                    {activeModule === 'auditoria' && 'acao' in item && (
+                      <Badge variant="outline">{(item as any).acao}</Badge>
                     )}
                     
                     {activeModule !== 'auditoria' && (
@@ -1391,6 +1497,20 @@ export default function AdminPanel() {
                   </div>
                 </div>
               </CardHeader>
+              {activeModule === 'auditoria' && showDetails && (
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-medium">IP:</span>
+                      <span>{(item as any).ip || 'Não informado'}</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className="font-medium">Data:</span>
+                      <span>{formatDate((item as any).created_at)}</span>
+                    </div>
+                  </div>
+                </CardContent>
+              )}
             </Card>
           ))}
         </div>
@@ -1482,24 +1602,13 @@ export default function AdminPanel() {
               setSelectedItem(null);
             }
           }}>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-2xl">
               <DialogHeader>
                 <DialogTitle>
-                  {isCreateDialogOpen 
-                    ? (activeModule === 'editar-catalogo' 
-                        ? `Criar ${getCatalogoTitle().slice(0, -1)}` 
-                        : `Criar ${getModuleTitle().slice(0, -1)}`)
-                    : (activeModule === 'editar-catalogo' 
-                        ? `Editar ${getCatalogoTitle().slice(0, -1)}` 
-                        : `Editar ${getModuleTitle().slice(0, -1)}`)
-                  }
+                  {isCreateDialogOpen ? `Criar ${getModuleTitle().slice(0, -1)}` : `Editar Catálogo`}
                 </DialogTitle>
                 <DialogDescription>
-                  Preencha os campos obrigatórios para {isCreateDialogOpen ? 'criar' : 'editar'} o {
-                    activeModule === 'editar-catalogo' 
-                      ? getCatalogoTitle().slice(0, -1).toLowerCase()
-                      : getModuleTitle().slice(0, -1).toLowerCase()
-                  }.
+                  Preencha os campos obrigatórios para {isCreateDialogOpen ? 'criar' : 'editar'} o {getModuleTitle().slice(0, -1).toLowerCase()}.
                 </DialogDescription>
               </DialogHeader>
               
@@ -1596,21 +1705,12 @@ export default function AdminPanel() {
                         {catalogoModule === 'areas' && (
                           <>
                             <div>
-                              <Label htmlFor="nome">Nome *</Label>
+                              <Label htmlFor="nome">Nome da Área *</Label>
                               <Input
                                 id="nome"
                                 value={formData.nome || ''}
                                 onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
                                 required
-                              />
-                            </div>
-                            <div>
-                              <Label htmlFor="icone">Ícone</Label>
-                              <Input
-                                id="icone"
-                                value={formData.icone || ''}
-                                onChange={(e) => setFormData({ ...formData, icone: e.target.value })}
-                                placeholder="👥"
                               />
                             </div>
                             <div>
@@ -1621,13 +1721,22 @@ export default function AdminPanel() {
                                 onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
                               />
                             </div>
+                            <div>
+                              <Label htmlFor="icone">Ícone</Label>
+                              <Input
+                                id="icone"
+                                value={formData.icone || ''}
+                                onChange={(e) => setFormData({ ...formData, icone: e.target.value })}
+                                placeholder="Nome do ícone (ex: building, users, etc.)"
+                              />
+                            </div>
                           </>
                         )}
 
                         {catalogoModule === 'processos' && (
                           <>
                             <div>
-                              <Label htmlFor="nome">Nome *</Label>
+                              <Label htmlFor="nome">Nome do Processo *</Label>
                               <Input
                                 id="nome"
                                 value={formData.nome || ''}
@@ -1637,44 +1746,21 @@ export default function AdminPanel() {
                             </div>
                             <div>
                               <Label htmlFor="area_id">Área *</Label>
-                              <Popover>
-                                <PopoverTrigger asChild>
-                                  <Button
-                                    variant="outline"
-                                    role="combobox"
-                                    className="w-full justify-between"
-                                  >
-                                    {formData.area_id
-                                      ? areasForSelect?.find((area) => area.id === formData.area_id)?.nome
-                                      : "Selecione uma área..."}
-                                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                  </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-full p-0">
-                                  <Command>
-                                    <CommandInput placeholder="Buscar área..." />
-                                    <CommandList>
-                                      <CommandEmpty>Nenhuma área encontrada.</CommandEmpty>
-                                      <CommandGroup>
-                                        {areasForSelect?.map((area) => (
-                                          <CommandItem
-                                            key={area.id}
-                                            value={area.nome}
-                                            onSelect={() => setFormData({ ...formData, area_id: area.id })}
-                                          >
-                                            <Check
-                                              className={`mr-2 h-4 w-4 ${
-                                                formData.area_id === area.id ? "opacity-100" : "opacity-0"
-                                              }`}
-                                            />
-                                            {area.nome}
-                                          </CommandItem>
-                                        ))}
-                                      </CommandGroup>
-                                    </CommandList>
-                                  </Command>
-                                </PopoverContent>
-                              </Popover>
+                              <Select
+                                value={formData.area_id || ''}
+                                onValueChange={(value) => setFormData({ ...formData, area_id: value })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Selecione uma área" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {areas?.map((area) => (
+                                    <SelectItem key={area.id} value={area.id}>
+                                      {area.nome}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                             </div>
                             <div>
                               <Label htmlFor="descricao">Descrição</Label>
@@ -1690,7 +1776,7 @@ export default function AdminPanel() {
                         {catalogoModule === 'subprocessos' && (
                           <>
                             <div>
-                              <Label htmlFor="nome">Nome *</Label>
+                              <Label htmlFor="nome">Nome do Subprocesso *</Label>
                               <Input
                                 id="nome"
                                 value={formData.nome || ''}
@@ -1699,45 +1785,41 @@ export default function AdminPanel() {
                               />
                             </div>
                             <div>
+                              <Label htmlFor="area_id">Área *</Label>
+                              <Select
+                                value={formData.area_id || ''}
+                                onValueChange={(value) => setFormData({ ...formData, area_id: value })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Selecione uma área" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {areas?.map((area) => (
+                                    <SelectItem key={area.id} value={area.id}>
+                                      {area.nome}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
                               <Label htmlFor="processo_id">Processo *</Label>
-                              <Popover>
-                                <PopoverTrigger asChild>
-                                  <Button
-                                    variant="outline"
-                                    role="combobox"
-                                    className="w-full justify-between"
-                                  >
-                                    {formData.processo_id
-                                      ? processos?.find((processo) => processo.id === formData.processo_id)?.nome
-                                      : "Selecione um processo..."}
-                                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                  </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-full p-0">
-                                  <Command>
-                                    <CommandInput placeholder="Buscar processo..." />
-                                    <CommandList>
-                                      <CommandEmpty>Nenhum processo encontrado.</CommandEmpty>
-                                      <CommandGroup>
-                                        {processos?.map((processo) => (
-                                          <CommandItem
-                                            key={processo.id}
-                                            value={`${processo.area?.nome} ${processo.nome}`}
-                                            onSelect={() => setFormData({ ...formData, processo_id: processo.id })}
-                                          >
-                                            <Check
-                                              className={`mr-2 h-4 w-4 ${
-                                                formData.processo_id === processo.id ? "opacity-100" : "opacity-0"
-                                              }`}
-                                            />
-                                            {processo.area?.nome} → {processo.nome}
-                                          </CommandItem>
-                                        ))}
-                                      </CommandGroup>
-                                    </CommandList>
-                                  </Command>
-                                </PopoverContent>
-                              </Popover>
+                              <Select
+                                value={formData.processo_id || ''}
+                                onValueChange={(value) => setFormData({ ...formData, processo_id: value })}
+                                disabled={!formData.area_id}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder={formData.area_id ? "Selecione um processo" : "Primeiro selecione uma área"} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {processosHierarquicos.map((processo) => (
+                                    <SelectItem key={processo.id} value={processo.id}>
+                                      {processo.nome}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                             </div>
                             <div>
                               <Label htmlFor="descricao">Descrição</Label>
@@ -1753,7 +1835,7 @@ export default function AdminPanel() {
                         {catalogoModule === 'servicos' && (
                           <>
                             <div>
-                              <Label htmlFor="produto">Produto/Serviço *</Label>
+                              <Label htmlFor="produto">Nome do Serviço *</Label>
                               <Input
                                 id="produto"
                                 value={formData.produto || ''}
@@ -1762,45 +1844,60 @@ export default function AdminPanel() {
                               />
                             </div>
                             <div>
+                              <Label htmlFor="area_id">Área *</Label>
+                              <Select
+                                value={formData.area_id || ''}
+                                onValueChange={(value) => setFormData({ ...formData, area_id: value })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Selecione uma área" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {areas?.map((area) => (
+                                    <SelectItem key={area.id} value={area.id}>
+                                      {area.nome}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label htmlFor="processo_id">Processo *</Label>
+                              <Select
+                                value={formData.processo_id || ''}
+                                onValueChange={(value) => setFormData({ ...formData, processo_id: value })}
+                                disabled={!formData.area_id}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder={formData.area_id ? "Selecione um processo" : "Primeiro selecione uma área"} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {processosHierarquicos.map((processo) => (
+                                    <SelectItem key={processo.id} value={processo.id}>
+                                      {processo.nome}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
                               <Label htmlFor="subprocesso_id">Subprocesso *</Label>
-                              <Popover>
-                                <PopoverTrigger asChild>
-                                  <Button
-                                    variant="outline"
-                                    role="combobox"
-                                    className="w-full justify-between"
-                                  >
-                                    {formData.subprocesso_id
-                                      ? subprocessos?.find((subprocesso) => subprocesso.id === formData.subprocesso_id)?.nome
-                                      : "Selecione um subprocesso..."}
-                                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                  </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-full p-0">
-                                  <Command>
-                                    <CommandInput placeholder="Buscar subprocesso..." />
-                                    <CommandList>
-                                      <CommandEmpty>Nenhum subprocesso encontrado.</CommandEmpty>
-                                      <CommandGroup>
-                                        {subprocessos?.map((subprocesso) => (
-                                          <CommandItem
-                                            key={subprocesso.id}
-                                            value={`${subprocesso.processo?.area?.nome} ${subprocesso.processo?.nome} ${subprocesso.nome}`}
-                                            onSelect={() => setFormData({ ...formData, subprocesso_id: subprocesso.id })}
-                                          >
-                                            <Check
-                                              className={`mr-2 h-4 w-4 ${
-                                                formData.subprocesso_id === subprocesso.id ? "opacity-100" : "opacity-0"
-                                              }`}
-                                            />
-                                            {subprocesso.processo?.area?.nome} → {subprocesso.processo?.nome} → {subprocesso.nome}
-                                          </CommandItem>
-                                        ))}
-                                      </CommandGroup>
-                                    </CommandList>
-                                  </Command>
-                                </PopoverContent>
-                              </Popover>
+                              <Select
+                                value={formData.subprocesso_id || ''}
+                                onValueChange={(value) => setFormData({ ...formData, subprocesso_id: value })}
+                                disabled={!formData.processo_id}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder={formData.processo_id ? "Selecione um subprocesso" : "Primeiro selecione um processo"} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {subprocessosHierarquicos.map((subprocesso) => (
+                                    <SelectItem key={subprocesso.id} value={subprocesso.id}>
+                                      {subprocesso.nome}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                             </div>
                             <div>
                               <Label htmlFor="o_que_e">O que é</Label>
@@ -1808,6 +1905,7 @@ export default function AdminPanel() {
                                 id="o_que_e"
                                 value={formData.o_que_e || ''}
                                 onChange={(e) => setFormData({ ...formData, o_que_e: e.target.value })}
+                                placeholder="Descrição do que é este serviço"
                               />
                             </div>
                             <div>
@@ -1816,6 +1914,45 @@ export default function AdminPanel() {
                                 id="quem_pode_utilizar"
                                 value={formData.quem_pode_utilizar || ''}
                                 onChange={(e) => setFormData({ ...formData, quem_pode_utilizar: e.target.value })}
+                                placeholder="Ex: Todos os funcionários, Gerentes, etc."
+                              />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <Label htmlFor="tempo_medio">Tempo Médio</Label>
+                                <Input
+                                  id="tempo_medio"
+                                  type="number"
+                                  value={formData.tempo_medio || ''}
+                                  onChange={(e) => setFormData({ ...formData, tempo_medio: parseInt(e.target.value) || 0 })}
+                                  placeholder="Ex: 5"
+                                />
+                              </div>
+                              <div>
+                                <Label htmlFor="unidade_medida">Unidade de Medida</Label>
+                                <Select
+                                  value={formData.unidade_medida || ''}
+                                  onValueChange={(value) => setFormData({ ...formData, unidade_medida: value })}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Selecione" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="dias">Dias</SelectItem>
+                                    <SelectItem value="horas">Horas</SelectItem>
+                                    <SelectItem value="minutos">Minutos</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                            <div>
+                              <Label htmlFor="sla">SLA (horas)</Label>
+                              <Input
+                                id="sla"
+                                type="number"
+                                value={formData.sla || ''}
+                                onChange={(e) => setFormData({ ...formData, sla: parseInt(e.target.value) || 0 })}
+                                placeholder="Ex: 24"
                               />
                             </div>
                           </>
@@ -1825,131 +1962,138 @@ export default function AdminPanel() {
                   </TabsContent>
                   
                   <TabsContent value="advanced" className="space-y-4">
-                    {activeModule === 'usuarios' && (
+                    {activeModule === 'editar-catalogo' && (
                       <>
-                        <div>
-                          <Label htmlFor="telefone">Telefone</Label>
-                          <Input
-                            id="telefone"
-                            value={formData.telefone || ''}
-                            onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="departamento">Departamento</Label>
-                          <Input
-                            id="departamento"
-                            value={formData.departamento || ''}
-                            onChange={(e) => setFormData({ ...formData, departamento: e.target.value })}
-                          />
-                        </div>
-                      </>
-                    )}
+                        {catalogoModule === 'servicos' && (
+                          <>
+                            <div>
+                              <Label htmlFor="sli">SLI (horas)</Label>
+                              <Input
+                                id="sli"
+                                type="number"
+                                value={formData.sli || ''}
+                                onChange={(e) => setFormData({ ...formData, sli: parseInt(e.target.value) || 0 })}
+                                placeholder="Ex: 48"
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="ano">Ano de Implementação</Label>
+                              <Input
+                                id="ano"
+                                type="number"
+                                value={formData.ano || ''}
+                                onChange={(e) => setFormData({ ...formData, ano: parseInt(e.target.value) || 0 })}
+                                placeholder="Ex: 2024"
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="requisitos_operacionais">Requisitos Operacionais</Label>
+                              <Textarea
+                                id="requisitos_operacionais"
+                                value={formData.requisitos_operacionais || ''}
+                                onChange={(e) => setFormData({ ...formData, requisitos_operacionais: e.target.value })}
+                                placeholder="Descreva os requisitos operacionais..."
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="observacoes">Observações</Label>
+                              <Textarea
+                                id="observacoes"
+                                value={formData.observacoes || ''}
+                                onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
+                                placeholder="Observações adicionais..."
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="demanda_rotina">Tipo de Demanda</Label>
+                              <Select
+                                value={formData.demanda_rotina || ''}
+                                onValueChange={(value) => setFormData({ ...formData, demanda_rotina: value })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Selecione o tipo" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="rotina">Rotina</SelectItem>
+                                  <SelectItem value="demanda">Demanda</SelectItem>
+                                  <SelectItem value="ambos">Ambos</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </>
+                        )}
 
-                    {activeModule === 'faq' && (
-                      <>
-                        <div>
-                          <Label htmlFor="tags">Tags</Label>
-                          <Input
-                            id="tags"
-                            value={formData.tags || ''}
-                            onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
-                            placeholder="Ex: pagamento, prazo, acompanhamento"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="ordem">Ordem de Exibição</Label>
-                          <Input
-                            id="ordem"
-                            type="number"
-                            value={formData.ordem || ''}
-                            onChange={(e) => setFormData({ ...formData, ordem: parseInt(e.target.value) || 0 })}
-                          />
-                        </div>
-                      </>
-                    )}
+                        {catalogoModule === 'areas' && (
+                          <>
+                            <div>
+                              <Label htmlFor="cor">Cor da Área</Label>
+                              <Input
+                                id="cor"
+                                type="color"
+                                value={formData.cor || '#3b82f6'}
+                                onChange={(e) => setFormData({ ...formData, cor: e.target.value })}
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="ordem">Ordem de Exibição</Label>
+                              <Input
+                                id="ordem"
+                                type="number"
+                                value={formData.ordem || ''}
+                                onChange={(e) => setFormData({ ...formData, ordem: parseInt(e.target.value) || 0 })}
+                                placeholder="Ex: 1"
+                              />
+                            </div>
+                          </>
+                        )}
 
-                    {activeModule === 'editar-catalogo' && catalogoModule === 'servicos' && (
-                      <>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <Label htmlFor="tempo_medio">Tempo Médio</Label>
-                            <Input
-                              id="tempo_medio"
-                              type="number"
-                              value={formData.tempo_medio || ''}
-                              onChange={(e) => setFormData({ ...formData, tempo_medio: e.target.value ? parseInt(e.target.value) : null })}
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor="unidade_medida">Unidade de Medida</Label>
-                            <Select
-                              value={formData.unidade_medida || ''}
-                              onValueChange={(value) => setFormData({ ...formData, unidade_medida: value })}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Selecione" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="Minutos">Minutos</SelectItem>
-                                <SelectItem value="Horas">Horas</SelectItem>
-                                <SelectItem value="Dias">Dias</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <Label htmlFor="sla">SLA (horas)</Label>
-                            <Input
-                              id="sla"
-                              type="number"
-                              value={formData.sla || ''}
-                              onChange={(e) => setFormData({ ...formData, sla: e.target.value ? parseInt(e.target.value) : null })}
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor="sli">SLI (%)</Label>
-                            <Input
-                              id="sli"
-                              type="number"
-                              step="0.01"
-                              value={formData.sli || ''}
-                              onChange={(e) => setFormData({ ...formData, sli: e.target.value ? parseFloat(e.target.value) : null })}
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <Label htmlFor="demanda_rotina">Tipo de Demanda</Label>
-                          <Select
-                            value={formData.demanda_rotina || ''}
-                            onValueChange={(value) => setFormData({ ...formData, demanda_rotina: value })}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Demanda">Demanda</SelectItem>
-                              <SelectItem value="Rotina">Rotina</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <Label htmlFor="requisitos_operacionais">Requisitos Operacionais</Label>
-                          <Textarea
-                            id="requisitos_operacionais"
-                            value={formData.requisitos_operacionais || ''}
-                            onChange={(e) => setFormData({ ...formData, requisitos_operacionais: e.target.value })}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="observacoes">Observações</Label>
-                          <Textarea
-                            id="observacoes"
-                            value={formData.observacoes || ''}
-                            onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
-                          />
-                        </div>
+                        {catalogoModule === 'processos' && (
+                          <>
+                            <div>
+                              <Label htmlFor="ordem">Ordem de Exibição</Label>
+                              <Input
+                                id="ordem"
+                                type="number"
+                                value={formData.ordem || ''}
+                                onChange={(e) => setFormData({ ...formData, ordem: parseInt(e.target.value) || 0 })}
+                                placeholder="Ex: 1"
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="responsavel">Responsável</Label>
+                              <Input
+                                id="responsavel"
+                                value={formData.responsavel || ''}
+                                onChange={(e) => setFormData({ ...formData, responsavel: e.target.value })}
+                                placeholder="Nome do responsável"
+                              />
+                            </div>
+                          </>
+                        )}
+
+                        {catalogoModule === 'subprocessos' && (
+                          <>
+                            <div>
+                              <Label htmlFor="ordem">Ordem de Exibição</Label>
+                              <Input
+                                id="ordem"
+                                type="number"
+                                value={formData.ordem || ''}
+                                onChange={(e) => setFormData({ ...formData, ordem: parseInt(e.target.value) || 0 })}
+                                placeholder="Ex: 1"
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="responsavel">Responsável</Label>
+                              <Input
+                                id="responsavel"
+                                value={formData.responsavel || ''}
+                                onChange={(e) => setFormData({ ...formData, responsavel: e.target.value })}
+                                placeholder="Nome do responsável"
+                              />
+                            </div>
+                          </>
+                        )}
                       </>
                     )}
                   </TabsContent>
@@ -1965,7 +2109,7 @@ export default function AdminPanel() {
                     Cancelar
                   </Button>
                   <Button type="submit">
-                    {isCreateDialogOpen ? (activeModule === 'editar-catalogo' ? `Criar ${getCatalogoTitle().slice(0, -1)}` : 'Criar') : 'Salvar'}
+                    {isCreateDialogOpen ? 'Criar' : 'Salvar'}
                   </Button>
                 </DialogFooter>
               </form>

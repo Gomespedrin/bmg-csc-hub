@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
 import { createAreaUrl } from "@/lib/utils";
+import { useMemo } from "react";
 
 interface AreaCardProps {
   area: {
@@ -25,7 +26,11 @@ const getAreaIcon = (areaName: string) => {
 
 export function AreaCard({ area }: AreaCardProps) {
   const IconComponent = getAreaIcon(area.nome);
-  const areaUrl = createAreaUrl(area.nome, area.id);
+  
+  // Memoizar a URL para evitar recálculos desnecessários
+  const areaUrl = useMemo(() => {
+    return createAreaUrl(area.nome, area.id);
+  }, [area.nome, area.id]);
 
   return (
     <Card className="group card-elevated hover-lift hover-glow cursor-pointer">
